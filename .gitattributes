@@ -1,0 +1,2 @@
+tests/test_inputs/** filter=lfs diff=lfs merge=lfs -text
+tests/test_ignitions/** filter=lfs diff=lfs merge=lfs -text
