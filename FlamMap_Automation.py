@@ -33,8 +33,13 @@ def genCommandFile(outPath, commandOut):
     return
 
 
-def genFarsiteInputFile(outPath, modelBaseName, fuelMoistureData, weatherData, foliarMC=100, burnPeriods=1,
-                        crownFireMethod='Reinhardt', numProcessors=1):
+def genFlamMapInputFile(outPath, modelBaseName, fuel_cnd_end, fuelMoistureData,
+                        raws_elev, raws_units, weatherData,
+                        foliarMC=100, crownFireMethod='ScottReinhardt', numProcessors=1,
+                        wnd_spd_units=0, wind_dir_path='', wind_spd_path=''
+                        ):
+
+    # Delete existing output file
     if os.path.exists(outPath):
         os.remove(outPath)
 
@@ -42,32 +47,36 @@ def genFarsiteInputFile(outPath, modelBaseName, fuelMoistureData, weatherData, f
     try:
         file = open(outPath, 'w')
         file.write(
-            f"""# FARSITE INPUT FILE FOR {modelBaseName}
-FARSITE INPUTS FILE VERSION 1.0
-FARSITE_START_TIME: 08 15 0000
-FARSITE_END_TIME: 08 19 2300
-FARSITE_TIMESTEP: 60
-FARSITE_DISTANCE_RES: 10.0
-FARSITE_PERIMETER_RES: 60.0
-FARSITE_MIN_IGNITION_VERTEX_DISTANCE: 15.0
-FARSITE_SPOT_GRID_RESOLUTION: 5.0
-FARSITE_SPOT_PROBABILITY: 0
-FARSITE_SPOT_IGNITION_DELAY: 0
-FARSITE_MINIMUM_SPOT_DISTANCE: 10
-FARSITE_ACCELERATION_ON: 1
-FARSITE_FILL_BARRIERS: 1
-SPOTTING_SEED: 219490
-FARSITE_BURN_PERIODS: {burnPeriods}
-08 18 1200 1800
-08 19 1200 1800
+            f"""# FLAMMAP INPUT FILE FOR {modelBaseName}
+FlamMap-Inputs-File-Version-1
+CONDITIONING_PERIOD_END: {fuel_cnd_end}
 
 FUEL_MOISTURES_DATA: {fuelMoistureData[0]}
 {fuelMoistureData[1]}
+RAWS_ELEVATION: {raws_elev}
+RAWS_UNITS: {raws_units}
+
+RAWS: {weatherData[0]}
 {weatherData[1]}
 
 FOLIAR_MOISTURE_CONTENT: {foliarMC}
-NUMBER_PROCESSORS: {numProcessors}
 CROWN_FIRE_METHOD: {crownFireMethod}
+NUMBER_PROCESSORS: {numProcessors}
+SPREAD_DIRECTION_FROM_MAX: 0
+WIND_SPEED_UNITS: {wnd_spd_units}
+GRIDDED_WINDS_DIRECTION_FILE: {wind_dir_path}
+GRIDDED_WINDS_SPEED_FILE: {wind_spd_path}
+
+CROWNSTATE:
+INTENSITY:
+SPREADRATE:
+CROWNFRACTIONBURNED:
+FLAMELENGTH:
+MIDFLAME:
+FUELMOISTURE1:
+FUELMOISTURE10:
+FUELMOISTURE100:
+FUELMOISTURE1000:
 """
         )
         file.close()
@@ -80,7 +89,7 @@ CROWN_FIRE_METHOD: {crownFireMethod}
 def main():
     # ### GET PATHS TO DIRECTORIES AND FILES
     # Path to TestFARSITE executable file
-    flammap_exePath = '.\\Supplementary_Data\\FB_x64\\bin\\TestFARSITE'
+    flammap_exePath = '.\\Supplementary_Data\\FB_x64\\bin\\TestFlamMap'
     # Path to farsite modelling data folder
     #flammap_dataPath = '.\\Supplementary_Data\\Farsite_Data'
     flammap_dataPath = r'E:\EastKootenayProject_FarsiteTesting'
@@ -114,13 +123,13 @@ def main():
     #ignition_file_path = os.path.join(farsite_dataPath, ignition_file_name)
 
     # Name and path of Farsite modelling output data
-    outBaseName = 'FarsiteTest'
+    outBaseName = 'FlamMapTest'
     outPath = os.path.join(flammap_dataPath, 'Outputs', outBaseName)
 
 
     # ### SET UP COMMAND FILE PARAMETERS (ALL 6 REQUIRED)
     # Command file name and path
-    command_file_name = 'FarsiteTestCmd.txt'
+    command_file_name = 'FlamMapTestCmd.txt'
     command_file_path = os.path.join(flammap_dataPath, command_file_name)
     # Command file input parameters
     lcpFile = lcp_file_name                     # Name of landscape file
@@ -140,7 +149,7 @@ def main():
     # Get weather data
     weatherData = getText(weather_dataPath)
     # Generate input file
-    genFarsiteInputFile(outPath=input_file_path, modelBaseName=outBaseName, fuelMoistureData=fuelMoistureData,
+    genFlamMapInputFile(outPath=input_file_path, modelBaseName=outBaseName, fuelMoistureData=fuelMoistureData,
                         weatherData=weatherData, foliarMC=foliarMC,
                         burnPeriods=burnPeriods, crownFireMethod=crownFireMethod, numProcessors=numProcessors)
     # Generate command file (THIS COULD BE WRITTEN TO INCLUDE MULTIPLE INPUT FILES)
@@ -162,15 +171,17 @@ def main():
 if __name__ == '__main__':
     main()
 
-flammap_dataPath = '.\\Supplementary_Data\\FlamMap_Data'
-flammap_exePath = '.\\Supplementary_Data\\FB_x64\\bin\\TestFlamMap'
+fbx64_path = '.\\Supplementary_Data\\FB_x64\\'
+app_path = os.path.join(fbx64_path, 'bin')
+flammap_exePath = os.path.join(app_path, 'TestFlamMap')
+flammap_dataPath = os.path.join(fbx64_path, 'TestFlamMap', 'SampleData')
 os.chdir(flammap_dataPath)
 
 # Run FlamMap Modelling
-flammapCon = subprocess.Popen(
+flammapCLI = subprocess.Popen(
     [f'{flammap_exePath}',
      '2427464Cmd.txt'],
     stdout=subprocess.PIPE
 )
-out, err = flammapCon.communicate()
+out, err = flammapCLI.communicate()
 print(out)
