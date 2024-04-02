@@ -34,7 +34,7 @@ def genCommandFile(outPath, commandOut):
 
 
 def genFarsiteInputFile(outPath, modelBaseName, fuelMoistureData, weatherData, foliarMC=100, burnPeriods=1,
-                        crownFireMethod='Reinhardt', numProcessors=1):
+                        crownFireMethod='ScottReinhardt'):
     if os.path.exists(outPath):
         os.remove(outPath)
 
@@ -66,7 +66,6 @@ FUEL_MOISTURES_DATA: {fuelMoistureData[0]}
 {weatherData[1]}
 
 FOLIAR_MOISTURE_CONTENT: {foliarMC}
-NUMBER_PROCESSORS: {numProcessors}
 CROWN_FIRE_METHOD: {crownFireMethod}
 """
         )
