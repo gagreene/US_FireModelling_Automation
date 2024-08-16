@@ -258,7 +258,7 @@ def genMTTInputFile(
 
 def runModel(app_selection, command_file_path):
     # ### RUN MODELLING
-    print(f'<<<<< Running {app_selection} modelling >>>>>')
+    print(f'<<<<< Running {app_selection} >>>>>')
     os.chdir(os.path.dirname(__file__) + r'\Supplementary_Data\FB_x64\bin')
     app_cli = subprocess.run(
         ['TestMTT', command_file_path],
