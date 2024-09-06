@@ -1,0 +1,1 @@
+..\..\bin\TestSpatialFOFEM .\FofemMortalityInputs.txt .\Outputs\testMortality
