@@ -1,0 +1,22 @@
+<PAMDataset>
+  <PAMRasterBand band="1">
+    <Description>TreeList IDs</Description>
+    <Histograms>
+      <HistItem>
+        <HistMin>12006.3137254902</HistMin>
+        <HistMax>81989.6862745098</HistMax>
+        <BucketCount>256</BucketCount>
+        <IncludeOutOfRange>1</IncludeOutOfRange>
+        <Approximate>0</Approximate>
+        <HistCounts>1|0|0|4|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|11|0|28|615|0|166|420|82|1|28|0|0|0|0|0|1|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|407|0|85|984|0|74|0|18|0|0|184|5131|29|5|32|1433|0|26|287|12|0|0|0|0|0|0|0|0|0|0|0|0|0|0|795|5519|3711|342|4363|11499|1307|10987|74|659|4450|202|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|1142|0|0|0|0|0|16|66|195|30|108|100|0|591|784|151|589|14|76|106|60|70|0|0|2770|5787|4142|606|0|0|0|0|0|0|0|0|0|0|2811|4261|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|956|1254|3680|116|73|13|8734|12954|6|0|0|510|10|8|0|0|0|0|119|35|62|659|250|80|0|96|30|365|267|149</HistCounts>
+      </HistItem>
+    </Histograms>
+    <Metadata>
+      <MDI key="STATISTICS_MAXIMUM">81853</MDI>
+      <MDI key="STATISTICS_MEAN">52669.396461933</MDI>
+      <MDI key="STATISTICS_MINIMUM">12143</MDI>
+      <MDI key="STATISTICS_STDDEV">16712.458960932</MDI>
+      <MDI key="STATISTICS_VALID_PERCENT">55.97</MDI>
+    </Metadata>
+  </PAMRasterBand>
+</PAMDataset>

@@ -1,0 +1,15 @@
+<PAMDataset>
+  <Metadata>
+    <MDI key="Gridded Winds Resolution">60</MDI>
+    <MDI key="Run Wind Direction">240</MDI>
+    <MDI key="Run Wind Speed">20</MDI>
+    <MDI key="Source Landscape">\2427464.lcp</MDI>
+  </Metadata>
+  <PAMRasterBand band="1">
+    <Description>Max Spot Direction              </Description>
+    <UnitType>degrees</UnitType>
+    <Metadata>
+      <MDI key="UnitOfMeasure">degrees</MDI>
+    </Metadata>
+  </PAMRasterBand>
+</PAMDataset>

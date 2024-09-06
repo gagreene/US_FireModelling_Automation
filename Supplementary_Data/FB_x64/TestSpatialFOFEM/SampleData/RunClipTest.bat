@@ -1,0 +1,1 @@
+..\..\bin\TestSpatialFOFEM .\FofemClipInputs.txt .\Outputs\ClipTest

@@ -1,0 +1,1 @@
+..\..\bin\TestRandig .\blumtn3GLCP.input .\Outputs\Test 0
