@@ -1,1 +1,0 @@
-..\..\bin\TestSpatialFOFEM .\EmissionTotalFuelsInputs.txt .\Outputs\EmissionTotalFuel

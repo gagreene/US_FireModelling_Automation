@@ -1,8 +1,0 @@
-#Sample SpatialFOFEM inputs file 
-#Mortality switches
-FOFEM_TreeListID_File: ..\SampleData\Landscape\BlueMountain_TreeMap2016.tif
-FOFEM_Flame_Length: 3.0
-FOFEM_Flame_Length_Precision: 1
-FOFEM_Mortality_Species: 2
-PIPO
-PSME
