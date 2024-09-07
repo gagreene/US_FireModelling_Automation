@@ -36,7 +36,7 @@ app_exe_dict = {
 }
 
 
-def downloadApps():
+def downloadApps() -> None:
     import requests
     import shutil
     import zipfile
