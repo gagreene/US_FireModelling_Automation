@@ -13,7 +13,8 @@ import rasterio as rio
 from rasterio import shutil
 from typing import Union, Optional
 
-fbx64_path = os.path.join(os.path.dirname(__file__), r'Supplementary_Data\FB_x64')
+supplementary_path = os.path.join(os.path.dirname(__file__), 'Supplementary_Data')
+fbx64_path = os.path.join(supplementary_path, 'FB_x64')
 bin_path = os.path.join(fbx64_path, 'bin')
 
 app_name_dict = {
@@ -33,6 +34,46 @@ app_exe_dict = {
     'FSPro': os.path.join(bin_path, 'TestFSPro'),
     'SpatialFOFEM': os.path.join(bin_path, 'TestSpatialFOFEM')
 }
+
+
+def downloadApps():
+    import requests
+    import shutil
+    import zipfile
+
+    # The URL of the zip file
+    data_url = 'https://www.alturassolutions.com/FB/FB.zip'
+
+    # Ensure the supplementary folder exists
+    os.makedirs(supplementary_path, exist_ok=True)
+
+    # Send an HTTP GET request to the URL
+    response = requests.get(data_url, stream=True)
+
+    # Check if the request was successful (status code 200)
+    if response.status_code == 200:
+        # Path to save the downloaded zip file
+        zip_file_path = os.path.join(supplementary_path, 'FB.zip')
+
+        # Open a local file in binary write mode and save the downloaded content
+        with open(zip_file_path, 'wb') as file:
+            shutil.copyfileobj(response.raw, file)
+
+        print(f'Download complete: {zip_file_path}')
+
+        # Extract the zip file to the supplementary folder
+        with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+            zip_ref.extractall(supplementary_path)
+
+        print(f'Extraction complete: {supplementary_path}')
+
+        # Delete the zip file after extraction
+        os.remove(zip_file_path)
+        print(f'Zip file removed: {zip_file_path}')
+    else:
+        print(f'Failed to download file: {response.status_code}')
+
+    return
 
 
 def genLCP(lcp_file: str = None,
