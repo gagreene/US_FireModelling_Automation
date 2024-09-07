@@ -165,11 +165,11 @@ def getText(in_path: str) -> tuple[int, str]:
 
 
 def genCommandFile(out_path: str,
-                   command_str: str) -> None:
+                   command_str:  list[list[str, str, str, int, str, int]]) -> None:
     """
     Function to generate a command file
     :param out_path: path to save the output command file
-    :param command_str: formatted string containing the command file data
+    :param command_str: list of lists that contain the command file data
     :return: None
     """
     if os.path.exists(out_path):
