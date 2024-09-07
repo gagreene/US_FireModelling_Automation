@@ -14,8 +14,8 @@ from rasterio import shutil
 from typing import Union, Optional
 
 supplementary_path = os.path.join(os.path.dirname(__file__), 'Supplementary_Data')
-fbx64_path = os.path.join(supplementary_path, 'FB_x64')
-bin_path = os.path.join(fbx64_path, 'bin')
+fb_path = os.path.join(supplementary_path, 'FB')
+bin_path = os.path.join(fb_path, 'bin')
 
 app_name_dict = {
     'FlamMap': 'TestFlamMap',
@@ -48,6 +48,7 @@ def downloadApps():
     os.makedirs(supplementary_path, exist_ok=True)
 
     # Send an HTTP GET request to the URL
+    print(f'Downloading FB data')
     response = requests.get(data_url, stream=True)
 
     # Check if the request was successful (status code 200)
@@ -936,6 +937,11 @@ def runApp(app_selection: str,
     :param command_file_path: path to command file
     :return: None
     """
+    # Check if the FB folder exists within the Supplementary_Data folder
+    # If not, download the application data
+    if not os.path.exists(fb_path):
+        downloadApps()
+
     # Get the name of the application executable file
     app_exe_path = app_exe_dict.get(app_selection, None)
 
@@ -976,12 +982,12 @@ def appTest(app_selection: str) -> None:
     :return: None
     """
     app_testData_dict = {
-        'FlamMap': os.path.join(fbx64_path, 'TestFlamMap\\SampleData'),
-        'MTT': os.path.join(fbx64_path, 'TestMTT\\SampleData'),
-        'TOM': os.path.join(fbx64_path, 'TestMTT\\SampleData'),
-        'Farsite': os.path.join(fbx64_path, 'TestFARSITE\\SampleData'),
-        # 'FSPro': os.path.join(fbx64_path, 'TestFSPro\\SampleData'),
-        # 'SpatialFOFEM': os.path.join(fbx64_path, 'TestSpatialFOFEM\\SampleData')
+        'FlamMap': os.path.join(fb_path, 'TestFlamMap\\SampleData'),
+        'MTT': os.path.join(fb_path, 'TestMTT\\SampleData'),
+        'TOM': os.path.join(fb_path, 'TestMTT\\SampleData'),
+        'Farsite': os.path.join(fb_path, 'TestFARSITE\\SampleData'),
+        # 'FSPro': os.path.join(fb_path, 'TestFSPro\\SampleData'),
+        # 'SpatialFOFEM': os.path.join(fb_path, 'TestSpatialFOFEM\\SampleData')
     }
 
     # Get the test application path
@@ -999,7 +1005,7 @@ def appTest(app_selection: str) -> None:
 
 if __name__ == '__main__':
     # Choose app to test the Missoula Fire Lab Command Line Applications
-    _app_selection = 'Farsite'  # Options: 'FlamMap', 'MTT', Farsite'
+    _app_selection = 'FlamMap'  # Options: 'FlamMap', 'MTT', Farsite'
 
     # Test the application
     appTest(app_selection=_app_selection)
