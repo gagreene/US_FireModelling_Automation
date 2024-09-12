@@ -756,7 +756,7 @@ def genInputFile(
             * FARSITE_FILL_BARRIERS: 1
     """
     # Delete existing output file
-    out_path = os.path.join(out_folder, out_name, '.input')
+    out_path = os.path.join(out_folder, f'{out_name}.input')
     if os.path.exists(out_path):
         os.remove(out_path)
 
