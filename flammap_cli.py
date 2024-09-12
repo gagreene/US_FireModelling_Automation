@@ -165,7 +165,7 @@ def getText(in_path: str) -> tuple[int, str]:
 
 
 def genCommandFile(out_path: str,
-                   command_list:  list[list[str, int]]) -> None:
+                   command_list:  list[list[Union[str, int]]]) -> None:
     """
     Function to generate a command file
     :param out_path: path to save the output command file
@@ -192,7 +192,7 @@ def genInputFile(
         app_select: str = 'FlamMap',
         output_list: Optional[list] = None,
         cond_period_end: Optional[str] = None,
-        fuel_moisture_data: Optional[list[int, str]] = None,
+        fuel_moisture_data: Optional[Union[list[int, str], tuple[int, str]]] = None,
         custom_fuels_file: Optional[str] = None,
         raws_units: Optional[str] = None,
         raws_elev: Union[int, float] = None,
@@ -923,16 +923,16 @@ def genInputFile(
                            'HEATAREA:\n'
                            'CROWNSTATE\n')
     except FileNotFoundError:
-        print('The command file directory does not exist')
+        print('The input file directory does not exist')
 
     return
 
 
-def runApp(app_selection: str,
+def runApp(app_select: str,
            command_file_path: str) -> None:
     """
     Function to run the selected fire app through the command line interface
-    :param app_selection: The name of the selected fire modelling application.
+    :param app_select: The name of the selected fire modelling application.
         Options are "FlamMap", "MTT", "TOM", "Farsite"
     :param command_file_path: path to command file
     :return: None
@@ -943,10 +943,10 @@ def runApp(app_selection: str,
         downloadApps()
 
     # Get the name of the application executable file
-    app_exe_path = app_exe_dict.get(app_selection, None)
+    app_exe_path = app_exe_dict.get(app_select, None)
 
     if app_exe_path is not None:
-        print(f'<<<<< Running {app_selection} >>>>>')
+        print(f'<<<<< Running {app_select} >>>>>')
         # Get the path to the current working directory
         current_dir = os.getcwd()
 
@@ -961,7 +961,7 @@ def runApp(app_selection: str,
             text=True
         )
         print(f'{app_cli}')
-        print(f'<<<<< {app_selection} modelling complete >>>>>')
+        print(f'<<<<< {app_select} modelling complete >>>>>')
 
         # Change the current working directory back to the original directory
         os.chdir(current_dir)
