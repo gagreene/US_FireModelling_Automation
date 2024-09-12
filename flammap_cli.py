@@ -165,7 +165,7 @@ def getText(in_path: str) -> tuple[int, str]:
 
 
 def genCommandFile(out_path: str,
-                   command_list:  list[list[str | int]]) -> None:
+                   command_list:  list[list[str, int]]) -> None:
     """
     Function to generate a command file
     :param out_path: path to save the output command file
@@ -219,7 +219,7 @@ def genInputFile(
         foliar_mc: Union[int, float] = 100,
         crown_fire_method: str = 'Finney',
         num_processors: int = 1,
-        mtt_res: Union[int, float] = 100,
+        mtt_resolution: Union[int, float] = 100,
         mtt_sim_time: int = 0,
         mtt_travel_path_interval: int = 500,
         mtt_spot_probability: float = 0,
@@ -319,7 +319,7 @@ def genInputFile(
     :param num_processors: The number of processors for FlamMap to use. Valid Range: 1..Number of logical
         processors on the machine. If greater than the number of available processors, 1 will be used.
         The default value is 1 if this switch is not present.
-    :param mtt_res: The resolution to run MTT. Outputs will be generated at the provided grid resolution.
+    :param mtt_resolution: The resolution to run MTT. Outputs will be generated at the provided grid resolution.
     :param mtt_sim_time: The number of minutes to burn the fire. Set to 0 to burn the entire landscape.
     :param mtt_travel_path_interval: The distance (in landscape units) for travel path creation.
     :param mtt_spot_probability: The probability of a spot creating an ignition.
@@ -834,7 +834,7 @@ def genInputFile(
 
             # Implement Minimum Travel Time (MTT) Switches
             if app_select == 'MTT':
-                file.write(f'MTT_RESOLUTION: {mtt_res}\n')
+                file.write(f'MTT_RESOLUTION: {mtt_resolution}\n')
                 file.write(f'MTT_SIM_TIME: {mtt_sim_time}\n')
                 file.write(f'MTT_TRAVEL_PATH_INTERVAL: {mtt_travel_path_interval}\n')
                 file.write(f'MTT_SPOT_PROBABILITY: {mtt_spot_probability}\n')
