@@ -172,6 +172,7 @@ def genCommandFile(out_path: str,
     :param command_list: list of lists that contain the command file data
     :return: None
     """
+    print('\n<<<<< [flammap_cli.py] Generating Command File >>>>>')
     if os.path.exists(out_path):
         os.remove(out_path)
 
@@ -180,6 +181,7 @@ def genCommandFile(out_path: str,
         for row in command_list:
             file.write(f'{row[0]} {row[1]} {row[2]} {row[3]} {row[4]} {row[5]}\n')
         file.close()
+        print('Command file complete')
     except FileNotFoundError:
         print('The command file directory does not exist')
 
@@ -254,7 +256,7 @@ def genInputFile(
         far_barrier_file: Optional[str] = None,
         far_fill_barriers: Optional[int] = None,
         far_ros_adjust_file: Optional[str] = None
-) -> None:
+) -> str:
     """
     Function to generate a FlamMap, MTT, TOM, or Farsite input file.
     :param out_folder: Path to output folder
@@ -283,12 +285,14 @@ def genInputFile(
     :param wind_data_units: Either METRIC or ENGLISH. Note: If not used wind data is assumed to be in
         English units.
     :param wind_data: List[0] The number of Wind Data records, and List[1] the actual Wind Data records.
-    :param spread_direction_from_north: The azimuth to offset spread directions. Note: Usage of this switch
-        is rare. Valid values: 0-360
+    :param spread_direction_from_north: The azimuth to offset spread directions. Note: Usage of this switch is rare.
+        Valid values: 0-360.
     :param spread_direction_from_max: The relative spread direction (azimuth) from the maximum.
-        Valid range: 0-360
-    :param gridded_wind_spd_file: The path to an ASCII grid of wind velocities in MPH.
-    :param gridded_wind_dir_file: The path to an ASCII grid of wind azimuths.
+        Valid range: 0-360.
+    :param gridded_wind_spd_file: The path to an ASCII or TIFF grid of wind velocities.
+        Must be an integer raster. Specify the units with the "wind_spd_units" variable.
+    :param gridded_wind_dir_file: The path to an ASCII or TIFF grid of wind azimuths in degrees.
+        Must be an integer raster.
     :param gridded_wind_gen: Either ‘Yes’ or ‘No’. Default is ‘No’. This switch will be ignored if the gridded
         winds resolution switch is not present or invalid.
     :param gridded_wind_res: The resolution to use for gridded winds in the same units as the landscape file.
@@ -400,7 +404,8 @@ def genInputFile(
     :param far_fill_barriers: Either 0 for false (no barrier fill) or 1 for true (fill the barriers).
         Farsite DLL will set all of the pixels inside a barrier polygon to non-burnable.
     :param far_ros_adjust_file: The name of the rate of spread adjustment file to use.
-    :return: None
+    :return: the path to the resulting input file
+
     **output_list**
         The following outputs are available for each App as described...
 
@@ -755,6 +760,7 @@ def genInputFile(
         Example:
             * FARSITE_FILL_BARRIERS: 1
     """
+    print(f'\n<<<<< [flammap_cli.py] Generating {app_select} Input File >>>>>')
     # Delete existing output file
     out_path = os.path.join(out_folder, f'{out_name}.input')
     if os.path.exists(out_path):
@@ -765,7 +771,12 @@ def genInputFile(
         with open(out_path, 'w') as file:
             # Implement Header Text
             file.write(f'#FLAMMAP INPUT FILE FOR {out_name}\n')
-            file.write('FlamMap-Inputs-File-Version-1\n')
+            if app_select == 'FlamMap':
+                file.write('FlamMap-Inputs-File-Version-1\n')
+            elif app_select in ['MTT', 'TOM']:
+                file.write('ShortTerm-Inputs-File-Version-1\n')
+            else:
+                file.write('FARSITE INPUTS FILE VERSION 1.0\n')
             # Implement Base/Common Fuel Moisture Switches
             if app_select in ['FlamMap', 'MTT', 'TOM']:
                 if cond_period_end:
@@ -922,10 +933,11 @@ def genInputFile(
                            'INTENSITY:\n'
                            'HEATAREA:\n'
                            'CROWNSTATE\n')
+        print('Input file complete')
     except FileNotFoundError:
         print('The input file directory does not exist')
 
-    return
+    return out_path
 
 
 def runApp(app_select: str,
@@ -946,25 +958,28 @@ def runApp(app_select: str,
     app_exe_path = app_exe_dict.get(app_select, None)
 
     if app_exe_path is not None:
-        print(f'<<<<< Running {app_select} >>>>>')
+        print(f'\n<<<<< [flammap_cli.py] Running {app_select} >>>>>')
         # Get the path to the current working directory
         current_dir = os.getcwd()
 
         # Change working directory to the Command Line Applications folder
-        os.chdir(os.path.dirname(command_file_path))
-        # os.chdir(bin_path)
+        new_dir = os.path.dirname(command_file_path)
+        print(f'Changing working directory to {new_dir}')
+        os.chdir(new_dir)
 
         # Run fire model through command line interface
+        print('Running CLI command...')
         app_cli = subprocess.run(
             [app_exe_path, command_file_path],
             capture_output=True,
             text=True
         )
         print(f'{app_cli}')
-        print(f'<<<<< {app_select} modelling complete >>>>>')
 
         # Change the current working directory back to the original directory
         os.chdir(current_dir)
+        print(f'Changing working directory back to {current_dir}...')
+        print(f'<<<<< {app_select} modelling complete >>>>>')
     else:
         # Raise a value error
         raise ValueError(f'Invalid fire model selected.\n'
