@@ -165,14 +165,17 @@ def getText(in_path: str) -> tuple[int, str]:
 
 
 def genCommandFile(out_path: str,
-                   command_list:  list[list[Union[str, int]]]) -> None:
+                   command_list:  list[list[Union[str, int]]],
+                   suppress_messages: bool = False) -> None:
     """
     Function to generate a command file
     :param out_path: path to save the output command file
     :param command_list: list of lists that contain the command file data
+    :param suppress_messages: if True, do not print messages from this function
     :return: None
     """
-    print('\n<<<<< [flammap_cli.py] Generating Command File >>>>>')
+    if not suppress_messages:
+        print('\n<<<<< [flammap_cli.py] Generating Command File >>>>>')
     if os.path.exists(out_path):
         os.remove(out_path)
 
@@ -181,7 +184,8 @@ def genCommandFile(out_path: str,
         for row in command_list:
             file.write(f'{row[0]} {row[1]} {row[2]} {row[3]} {row[4]} {row[5]}\n')
         file.close()
-        print('Command file complete')
+        if not suppress_messages:
+            print('Command file complete')
     except FileNotFoundError:
         print('The command file directory does not exist')
 
@@ -191,6 +195,7 @@ def genCommandFile(out_path: str,
 def genInputFile(
         out_folder: str,
         out_name: str,
+        suppress_messages: bool = False,
         app_select: str = 'FlamMap',
         output_list: Optional[list] = None,
         cond_period_end: Optional[str] = None,
@@ -261,6 +266,7 @@ def genInputFile(
     Function to generate a FlamMap, MTT, TOM, or Farsite input file.
     :param out_folder: Path to output folder
     :param out_name: Name of the input file
+    :param suppress_messages: if True, do not print messages from this function
     :param app_select: The name of the selected fire modelling application.
         Options are "FlamMap", "MTT", "TOM", "Farsite". Default = "FlamMap".
     :param output_list: List of requested output datasets. If left blank, default values will be used based on
@@ -760,7 +766,9 @@ def genInputFile(
         Example:
             * FARSITE_FILL_BARRIERS: 1
     """
-    print(f'\n<<<<< [flammap_cli.py] Generating {app_select} Input File >>>>>')
+    if not suppress_messages:
+        print(f'\n<<<<< [flammap_cli.py] Generating {app_select} Input File >>>>>')
+
     # Delete existing output file
     out_path = os.path.join(out_folder, f'{out_name}.input')
     if os.path.exists(out_path):
@@ -933,7 +941,9 @@ def genInputFile(
                            'INTENSITY:\n'
                            'HEATAREA:\n'
                            'CROWNSTATE\n')
-        print('Input file complete')
+
+        if not suppress_messages:
+            print('Input file complete')
     except FileNotFoundError:
         print('The input file directory does not exist')
 
@@ -941,12 +951,14 @@ def genInputFile(
 
 
 def runApp(app_select: str,
-           command_file_path: str) -> None:
+           command_file_path: str,
+           suppress_messages: bool = False) -> None:
     """
     Function to run the selected fire app through the command line interface
     :param app_select: The name of the selected fire modelling application.
         Options are "FlamMap", "MTT", "TOM", "Farsite"
     :param command_file_path: path to command file
+    :param suppress_messages
     :return: None
     """
     # Check if the FB folder exists within the Supplementary_Data folder
@@ -958,28 +970,33 @@ def runApp(app_select: str,
     app_exe_path = app_exe_dict.get(app_select, None)
 
     if app_exe_path is not None:
-        print(f'\n<<<<< [flammap_cli.py] Running {app_select} >>>>>')
+        if not suppress_messages:
+            print(f'\n<<<<< [flammap_cli.py] Running {app_select} >>>>>')
         # Get the path to the current working directory
         current_dir = os.getcwd()
 
         # Change working directory to the Command Line Applications folder
         new_dir = os.path.dirname(command_file_path)
-        print(f'Changing working directory to {new_dir}')
+        if not suppress_messages:
+            print(f'Changing working directory to {new_dir}')
         os.chdir(new_dir)
 
         # Run fire model through command line interface
-        print('Running CLI command...')
+        if not suppress_messages:
+            print('Running CLI command...')
         app_cli = subprocess.run(
             [app_exe_path, command_file_path],
             capture_output=True,
             text=True
         )
-        print(f'{app_cli}')
+        if not suppress_messages:
+            print(f'{app_cli}')
 
         # Change the current working directory back to the original directory
         os.chdir(current_dir)
-        print(f'Changing working directory back to {current_dir}...')
-        print(f'<<<<< {app_select} modelling complete >>>>>')
+        if not suppress_messages:
+            print(f'Changing working directory back to {current_dir}...')
+            print(f'<<<<< {app_select} modelling complete >>>>>')
     else:
         # Raise a value error
         raise ValueError(f'Invalid fire model selected.\n'
