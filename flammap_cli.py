@@ -127,7 +127,8 @@ def genLCP(lcp_file: str = None,
 
     out_meta = elev_ras.meta.copy()
     out_meta.update({'count': 8,
-                     'nodata': -999})
+                     'nodata': -999,
+                     'compress': 'LZW'})
 
     shutil.copyfiles(elev_ras.name, lcp_file)
 
