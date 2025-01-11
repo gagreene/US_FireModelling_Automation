@@ -165,6 +165,23 @@ def getText(in_path: str) -> tuple[int, str]:
     return lines, contents
 
 
+def genRawsString(raws_list: list[list]) -> str:
+    """
+    Converts a list of lists of weather data, and returns a tuple containing the length of the list,
+    and a RAWS formatted string representation of the weather data.
+
+    :param raws_list: A list of lists to process
+    :return: A tuple with the length of the list and the formatted string
+    """
+    if not all(isinstance(sublist, list) for sublist in raws_list):
+        raise ValueError("Input must be a list of lists.")
+
+    list_length = len(raws_list)
+    formatted_string = '\n'.join(' '.join(map(str, sublist)) for sublist in sorted(raws_list))
+
+    return list_length, formatted_string
+
+
 def genCommandFile(out_path: str,
                    command_list:  list[list[Union[str, int]]],
                    suppress_messages: bool = False) -> None:
