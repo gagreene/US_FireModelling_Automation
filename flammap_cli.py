@@ -87,7 +87,8 @@ def genLCP(lcp_file: str = None,
            cbh_path: str = None,
            cbd_path: str = None) -> None:
     """
-    Function to generate a tif LCP file from 8 required tif file inputs
+    Function to generate a tif LCP file from 8 required tif file inputs.
+
     :param lcp_file: path to output lcp file
     :param elev_path: path to elevation dataset
     :param slope_path: path to slope dataset (degrees)
@@ -141,7 +142,8 @@ def genLCP(lcp_file: str = None,
 
 def getText(in_path: str) -> tuple[int, str]:
     """
-    Function to extract text from a text file
+    Function to extract text from a text file.
+
     :param in_path: path to the text file
     :return: number of lines, and a formatted string containing the contents of the text file
     """
