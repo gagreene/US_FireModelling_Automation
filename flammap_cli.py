@@ -223,7 +223,7 @@ def genInputFile(
         custom_fuels_file: Optional[str] = None,
         raws_units: Optional[str] = None,
         raws_elev: Union[int, float] = None,
-        raws_data: Optional[str] = None,
+        raws_data: Optional[list[int, str]] = None,
         weather_data_units: Optional[str] = None,
         weather_data: Optional[list[int, str]] = None,
         wind_data_units: Optional[str] = None,
@@ -1057,7 +1057,7 @@ def appTest(app_selection: str) -> None:
 
 if __name__ == '__main__':
     # Choose app to test the Missoula Fire Lab Command Line Applications
-    _app_selection = 'FlamMap'  # Options: 'FlamMap', 'MTT', Farsite'
+    _app_selection = 'Farsite'  # Options: 'FlamMap', 'MTT', Farsite'
 
     # Test the application
     appTest(app_selection=_app_selection)
