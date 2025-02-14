@@ -133,6 +133,16 @@ def genLCP(lcp_file: str = None,
 
     shutil.copyfiles(elev_ras.name, lcp_file)
 
+    elev_ras.close()
+    slope_ras.close()
+    aspect_ras.close()
+    fbfm_ras.close()
+    cc_ras.close()
+    ch_ras.close()
+    cbh_ras.close()
+    cbd_ras.close()
+    del elev_ras, slope_ras, aspect_ras, fbfm_ras, cc_ras, ch_ras, cbh_ras, cbd_ras
+
     with rio.open(lcp_file, 'w', **out_meta) as dest:
         for band_nr, src in enumerate(file_list, start=1):
             dest.write(src, band_nr)
