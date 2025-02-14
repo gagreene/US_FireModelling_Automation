@@ -140,12 +140,13 @@ def genLCP(lcp_file: str = None,
     return
 
 
-def getText(in_path: str) -> tuple[int, str]:
+def getRawsTextFile(in_path: str) -> tuple[int, str]:
     """
-    Function to extract text from a text file.
+    Extracts contents from a text file containing RAWS-formatted weather data, and
+    returns a tuple containing the length of the data, and a string representation of the data.
 
-    :param in_path: path to the text file
-    :return: number of lines, and a formatted string containing the contents of the text file
+    :param in_path: Path to the text file.
+    :return: Number of lines, and a formatted string containing the contents of the text file.
     """
     lines = None
     contents = None
@@ -167,19 +168,21 @@ def getText(in_path: str) -> tuple[int, str]:
     return lines, contents
 
 
-def genRawsString(raws_list: list[list]) -> str:
+def genWeatherString(weather_list: list[list]) -> tuple[int, str]:
     """
-    Converts a list of lists of weather data, and returns a tuple containing the length of the list,
-    and a RAWS formatted string representation of the weather data.
+    Converts a list of lists of properly formatted weather data, and returns a tuple containing the
+    length of the list, and a string representation of the data.
+    This function is intended to be used if passing data from a Pandas DataFrame or array that has been
+    converted to a list of lists. Do not include column names, only the data.
 
-    :param raws_list: A list of lists to process
-    :return: A tuple with the length of the list and the formatted string
+    :param weather_list: A list of lists containing properly formatted weather data.
+    :return: A tuple with the length of the list and the formatted string.
     """
-    if not all(isinstance(sublist, list) for sublist in raws_list):
-        raise ValueError("Input must be a list of lists.")
+    if not all(isinstance(sublist, list) for sublist in weather_list):
+        raise ValueError('Input must be a list of lists.')
 
-    list_length = len(raws_list)
-    formatted_string = '\n'.join(' '.join(map(str, sublist)) for sublist in sorted(raws_list))
+    list_length = len(weather_list)
+    formatted_string = '\n'.join(' '.join(map(str, sublist)) for sublist in sorted(weather_list))
 
     return list_length, formatted_string
 
@@ -417,7 +420,8 @@ def genInputFile(
     :param far_spotting_seed: A number (integer from 0-999999) that is used in randomly generating spot fire
         occurrence and locations. This number generates automatically for newly created analyses.
         There is generally no need for users to change this value. When an analysis is copied, the
-        Spotting Seed is copied along with other settings. Two analyses with the same settings (including Spotting Seed) should generate the same spotting results.
+        Spotting Seed is copied along with other settings. Two analyses with the same settings
+        (including Spotting Seed) should generate the same spotting results.
         ** NOTE if FARSITE_SPOT_PROBABILITY is 0, this switch is not needed and will be ignored.
         ** NOTE if FARSITE_SPOT_PROBABILITY is >0, this switch is an optional input.
     :param far_accel_on: Either 0 for no acceleration or 1 to use acceleration.
@@ -772,7 +776,8 @@ def genInputFile(
             * DD is the day of the month,
             * the first HHmm is the burn period start hour and minute,
             * the second HHmm is the burn period end hour and minute.
-            Note that if no burn periods are used Farsite DLL will burn for the entire simulation period. Also, there can be more than one burn period per day but they must not overlap.
+            Note that if no burn periods are used Farsite DLL will burn for the entire simulation period. Also,
+            there can be more than one burn period per day but they must not overlap.
         Example:
             * FARSITE_BURN_PERIODS: 4
             * 08 07 1000 1800
