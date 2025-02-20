@@ -9,6 +9,7 @@ __author__ = ['Gregory A. Greene, map.n.trowel@gmail.com']
 import os
 import glob
 import subprocess
+import numpy as np
 import rasterio as rio
 from rasterio import shutil
 from typing import Union, Optional
@@ -77,15 +78,15 @@ def downloadApps() -> None:
     return
 
 
-def genLCP(lcp_file: str = None,
-           elev_path: str = None,
-           slope_path: str = None,
-           aspect_path: str = None,
-           fbfm_path: str = None,
-           cc_path: str = None,
-           ch_path: str = None,
-           cbh_path: str = None,
-           cbd_path: str = None) -> None:
+def genLCP(lcp_file: str,
+           elev_path: str,
+           slope_path: str,
+           aspect_path: str,
+           fbfm_path: str,
+           cc_path: str,
+           ch_path: str,
+           cbh_path: str,
+           cbd_path: str) -> None:
     """
     Function to generate a tif LCP file from 8 required tif file inputs.
 
@@ -100,53 +101,35 @@ def genLCP(lcp_file: str = None,
     :param cbd_path: path to canopy bulk density (CBD) dataset
     :return: None
     """
-    elev_ras = rio.open(elev_path, 'r+')
-    elev_array = elev_ras.read(1, masked=True)
+    print(f'Generating LCP file at {lcp_file}')
+    # Open all rasters and read as masked arrays
+    rasters = [elev_path, slope_path, aspect_path, fbfm_path, cc_path, ch_path, cbh_path, cbd_path]
+    raster_arrays = []
 
-    slope_ras = rio.open(slope_path, 'r+')
-    slope_array = slope_ras.read(1, masked=True)
+    with rio.open(elev_path) as ref_ras:
+        ref_shape = ref_ras.shape
+        out_meta = ref_ras.meta.copy()
+        ref_path = ref_ras.name
 
-    aspect_ras = rio.open(aspect_path, 'r+')
-    aspect_array = aspect_ras.read(1, masked=True)
+    for path in rasters:
+        with rio.open(path) as src:
+            arr = src.read(1)
+            if arr.shape != ref_shape:
+                raise ValueError(f'Raster size mismatch in {path}. Expected {ref_shape}, got {arr.shape}')
+            raster_arrays.append(arr)
 
-    fbfm_ras = rio.open(fbfm_path, 'r+')
-    fbfm_array = fbfm_ras.read(1, masked=True)
+    # Update metadata
+    out_meta.update({'count': 8, 'nodata': -999, 'compress': 'LZW'})
 
-    cc_ras = rio.open(cc_path, 'r+')
-    cc_array = cc_ras.read(1, masked=True)
+    # Replace existing lcp file with a copy of the reference (elevation) dataset
+    shutil.copyfiles(ref_path, lcp_file)
 
-    ch_ras = rio.open(ch_path, 'r+')
-    ch_array = ch_ras.read(1, masked=True)
-
-    cbh_ras = rio.open(cbh_path, 'r+')
-    cbh_array = cbh_ras.read(1, masked=True)
-
-    cbd_ras = rio.open(cbd_path, 'r+')
-    cbd_array = cbd_ras.read(1, masked=True)
-
-    file_list = [elev_array, slope_array, aspect_array, fbfm_array, cc_array, ch_array, cbh_array, cbd_array]
-
-    out_meta = elev_ras.meta.copy()
-    out_meta.update({'count': 8,
-                     'nodata': -999,
-                     'compress': 'LZW'})
-
-    shutil.copyfiles(elev_ras.name, lcp_file)
-
-    elev_ras.close()
-    slope_ras.close()
-    aspect_ras.close()
-    fbfm_ras.close()
-    cc_ras.close()
-    ch_ras.close()
-    cbh_ras.close()
-    cbd_ras.close()
-    del elev_ras, slope_ras, aspect_ras, fbfm_ras, cc_ras, ch_ras, cbh_ras, cbd_ras
-
+    # Write data to output LCP file
+    print('\tSaving LCP file')
     with rio.open(lcp_file, 'w', **out_meta) as dest:
-        for band_nr, src in enumerate(file_list, start=1):
-            dest.write(src, band_nr)
-        dest.close()
+        for band, arr in enumerate(raster_arrays, start=1):
+            dest.write(arr, band)
+
     return
 
 
