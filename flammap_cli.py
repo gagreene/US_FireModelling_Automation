@@ -219,7 +219,7 @@ def genInputFile(
         custom_fuels_file: Optional[str] = None,
         raws_units: Optional[str] = None,
         raws_elev: Union[int, float] = None,
-        raws_data: Optional[list[int, str]] = None,
+        raws_data: Optional[Union[list[int, str], tuple[int, str]]] = None,
         weather_data_units: Optional[str] = None,
         weather_data: Optional[list[int, str]] = None,
         wind_data_units: Optional[str] = None,
@@ -273,7 +273,7 @@ def genInputFile(
         far_spotting_seed: Optional[int] = None,
         far_accel_on: Optional[int] = None,
         far_ign_file: Optional[str] = None,
-        far_burn_periods: Optional[list[int, str]] = None,
+        far_burn_periods: Optional[Union[list[int, str], tuple[int, str]]] = None,
         far_barrier_file: Optional[str] = None,
         far_fill_barriers: Optional[int] = None,
         far_ros_adjust_file: Optional[str] = None
@@ -970,12 +970,14 @@ def genInputFile(
 
 def runApp(app_select: str,
            command_file_path: str,
+           app_exe_path: Optional[str] = None,
            suppress_messages: bool = False) -> None:
     """
     Function to run the selected fire app through the command line interface
     :param app_select: The name of the selected fire modelling application.
         Options are "FlamMap", "MTT", "TOM", "Farsite"
     :param command_file_path: path to command file
+    :param app_exe_path: path to the app executable file
     :param suppress_messages
     :return: None
     """
@@ -984,8 +986,9 @@ def runApp(app_select: str,
     if not os.path.exists(fb_path):
         downloadApps()
 
-    # Get the name of the application executable file
-    app_exe_path = app_exe_dict.get(app_select, None)
+    if app_exe_path is None:
+        # Get the name of the application executable file
+        app_exe_path = app_exe_dict.get(app_select, None)
 
     if app_exe_path is not None:
         if not suppress_messages:
@@ -1008,7 +1011,7 @@ def runApp(app_select: str,
             text=True
         )
         if not suppress_messages:
-            print(f'{app_cli}')
+            print(f'{app_cli.stdout}\n{app_cli.stderr}')
 
         # Change the current working directory back to the original directory
         os.chdir(current_dir)
