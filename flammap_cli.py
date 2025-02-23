@@ -9,7 +9,7 @@ __author__ = ['Gregory A. Greene, map.n.trowel@gmail.com']
 import os
 import glob
 import subprocess
-import numpy as np
+import psutil
 import rasterio as rio
 from rasterio import shutil
 from typing import Union, Optional
@@ -971,15 +971,15 @@ def genInputFile(
 def runApp(app_select: str,
            command_file_path: str,
            app_exe_path: Optional[str] = None,
-           suppress_messages: bool = False) -> None:
+           suppress_messages: bool = False) -> tuple[str, str]:
     """
     Function to run the selected fire app through the command line interface
     :param app_select: The name of the selected fire modelling application.
         Options are "FlamMap", "MTT", "TOM", "Farsite"
     :param command_file_path: path to command file
     :param app_exe_path: path to the app executable file
-    :param suppress_messages
-    :return: None
+    :param suppress_messages: suppress intermediate print statements during program execution
+    :return: A tuple containing the standard output messages, and the CLI app errors
     """
     # Check if the FB folder exists within the Supplementary_Data folder
     # If not, download the application data
@@ -993,30 +993,33 @@ def runApp(app_select: str,
     if app_exe_path is not None:
         if not suppress_messages:
             print(f'\n<<<<< [flammap_cli.py] Running {app_select} >>>>>')
-        # Get the path to the current working directory
-        current_dir = os.getcwd()
-
-        # Change working directory to the Command Line Applications folder
-        new_dir = os.path.dirname(command_file_path)
-        if not suppress_messages:
-            print(f'Changing working directory to {new_dir}')
-        os.chdir(new_dir)
 
         # Run fire model through command line interface
         if not suppress_messages:
             print('Running CLI command...')
-        app_cli = subprocess.run(
+        app_cli = subprocess.Popen(
             [app_exe_path, command_file_path],
-            capture_output=True,
-            text=True
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=os.path.dirname(command_file_path)
         )
+        stdout, stderr = app_cli.communicate()
         if not suppress_messages:
-            print(f'{app_cli.stdout}\n{app_cli.stderr}')
+            print(f'{stdout}\n{stderr}')
 
-        # Change the current working directory back to the original directory
-        os.chdir(current_dir)
+        del app_cli
+
+        # Delete the current CLI app process if it's still running
+        try:
+            worker_proc = psutil.Process(os.getpid())
+            for child in worker_proc.children(recursive=True):  # Kill all child processes running app
+                if app_name_dict[app_select] in child.name():
+                    child.kill()
+        except psutil.NoSuchProcess:
+            pass
+
         if not suppress_messages:
-            print(f'Changing working directory back to {current_dir}...')
             print(f'<<<<< {app_select} modelling complete >>>>>')
     else:
         # Raise a value error
@@ -1024,7 +1027,7 @@ def runApp(app_select: str,
                          f'The "app_selection" variable be one of the following:\n'
                          f'{", ".join(app_name_dict.keys())}')
 
-    return
+    return stdout, stderr
 
 
 def appTest(app_selection: str) -> None:
