@@ -964,6 +964,8 @@ def genInputFile(
             print('Input file complete')
     except FileNotFoundError:
         print('The input file directory does not exist')
+    except Exception as err:
+        print(err)
 
     return out_path
 
