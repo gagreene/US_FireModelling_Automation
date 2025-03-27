@@ -11,7 +11,8 @@ import glob
 import subprocess
 import psutil
 import rasterio as rio
-from rasterio import shutil
+from numpy import histogram
+from numpy.ma import masked_equal
 from typing import Union, Optional
 
 supplementary_path = os.path.join(os.path.dirname(__file__), 'Supplementary_Data')
@@ -102,33 +103,73 @@ def genLCP(lcp_file: str,
     :return: None
     """
     print(f'Generating LCP file at {lcp_file}')
+
     # Open all rasters and read as masked arrays
     rasters = [elev_path, slope_path, aspect_path, fbfm_path, cc_path, ch_path, cbh_path, cbd_path]
-    raster_arrays = []
+    band_names = ['elev', 'slope', 'aspect', 'fbfm', 'cnpy_cvr', 'cnpy_ht', 'cbh', 'cbd']
+    band_dtypes = ['int16', 'int16', 'int16', 'uint8', 'int16', 'int16', 'int16', 'int16']
 
+    # Read metadata from the reference raster
     with rio.open(elev_path) as ref_ras:
         ref_shape = ref_ras.shape
         out_meta = ref_ras.meta.copy()
-        ref_path = ref_ras.name
 
-    for path in rasters:
-        with rio.open(path) as src:
-            arr = src.read(1)
-            if arr.shape != ref_shape:
-                raise ValueError(f'Raster size mismatch in {path}. Expected {ref_shape}, got {arr.shape}')
-            raster_arrays.append(arr)
-
-    # Update metadata
-    out_meta.update({'count': 8, 'nodata': -999, 'compress': 'LZW'})
-
-    # Replace existing lcp file with a copy of the reference (elevation) dataset
-    shutil.copyfiles(ref_path, lcp_file)
+    # Update metadata for the output GeoTIFF
+    out_meta.update({
+        'count': 8,         # 8 output bands
+        'dtype': 'int16',   # 16-bit integer format
+        'nodata': -999,     # Nodata value for all bands
+        'compress': 'DEFLATE',  # Compression method
+        'zlevel': 9,        # Compression level (0-9)
+        'predictor': 2,     # Improve compression for continuous data
+        'tiled': True,      # Enable tiling for efficient access
+        'blockxsize': 128,  # Tile width
+        'blockysize': 128,  # Tile height
+        'BIGTIFF': 'YES'    # Support >4GB output files
+    })
 
     # Write data to output LCP file
     print('\tSaving LCP file')
-    with rio.open(lcp_file, 'w', **out_meta) as dest:
-        for band, arr in enumerate(raster_arrays, start=1):
-            dest.write(arr, band)
+    with rio.open(lcp_file, 'w', **out_meta) as dst:
+        # Loop through each input raster and corresponding band name
+        for band, (path, desc) in enumerate(zip(rasters, band_names), start=1):
+            with rio.open(path) as src:
+                # Read and convert to int16 to match output dtype
+                arr = src.read(1).astype('int16')
+
+                # Replace input nodata values with unified -999
+                nodata_value = src.nodata
+                if nodata_value is not None:
+                    arr[arr == nodata_value] = -999
+
+                # Check shape consistency with the reference raster
+                if arr.shape != ref_shape:
+                    raise ValueError(f'Raster size mismatch in {path}. Expected {ref_shape}, got {arr.shape}')
+
+                # Write the current band to the output file
+                dst.write(arr, band)
+
+                # Set band description (e.g., 'elev', 'slope', ...)
+                dst.set_band_description(band, desc)
+
+                # Mask nodata values before computing statistics
+                arr_masked = masked_equal(arr, -999)
+
+                # Compute and write basic stats as band-level metadata
+                stats = {
+                    'min': float(arr_masked.min()),
+                    'max': float(arr_masked.max()),
+                    'mean': float(arr_masked.mean()),
+                    'std': float(arr_masked.std())
+                }
+                dst.update_tags(band, **stats)
+
+                # Compute histogram (256 bins) and store as comma-separated string
+                hist, bin_edges = histogram(arr_masked.compressed(), bins=256)
+                dst.update_tags(band, histogram=','.join(map(str, hist.tolist())))
+
+        # Add overall description tag to the first band
+        dst.update_tags(1, DESCRIPTIONS=','.join(band_names))
 
     return
 
