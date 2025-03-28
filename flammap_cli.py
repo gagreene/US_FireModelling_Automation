@@ -89,7 +89,8 @@ def genLCP(lcp_file: str,
            cbh_path: str,
            cbd_path: str) -> None:
     """
-    Function to generate a tif LCP file from 8 required tif file inputs.
+    Generate a compressed, tiled, multiband GeoTIFF file suitable for use as a Landscape (LCP) file,
+    by stacking 8 raster tif file inputs. Results are not as compressed as the genLCP_gdal function.
 
     :param lcp_file: path to output lcp file
     :param elev_path: path to elevation dataset
@@ -104,7 +105,7 @@ def genLCP(lcp_file: str,
     """
     print(f'Generating LCP file at {lcp_file}')
 
-    # Open all rasters and read as masked arrays
+    # Generate raster and band names lists
     rasters = [elev_path, slope_path, aspect_path, fbfm_path, cc_path, ch_path, cbh_path, cbd_path]
     band_names = ['elev', 'slope', 'aspect', 'fbfm', 'cnpy_cvr', 'cnpy_ht', 'cbh', 'cbd']
 
@@ -169,6 +170,100 @@ def genLCP(lcp_file: str,
 
         # Add overall description tag to the first band
         dst.update_tags(1, DESCRIPTIONS=','.join(band_names))
+
+    print(f'\tLCP file complete')
+
+    return
+
+
+def genLCP_gdal(lcp_file: str,
+                elev_path: str,
+                slope_path: str,
+                aspect_path: str,
+                fbfm_path: str,
+                cc_path: str,
+                ch_path: str,
+                cbh_path: str,
+                cbd_path: str) -> None:
+    """
+    Generate a compressed, tiled, multiband GeoTIFF file suitable for use as a Landscape (LCP) file,
+    by stacking 8 raster layers using GDAL's VRT (Virtual Raster) and Translate functions.
+
+    This function mimics the output structure and compression (size) used by ArcGIS Pro when using the Composite Bands
+    tool to export stacked rasters to multi-band TIFF format with LZW compression.
+
+    :param lcp_file: path to output lcp file
+    :param elev_path: path to elevation dataset
+    :param slope_path: path to slope dataset (degrees)
+    :param aspect_path: path to aspect dataset (degrees)
+    :param fbfm_path: path to fire behavior fuel model (FBFM) dataset
+    :param cc_path: path to canopy cover dataset
+    :param ch_path: path to canopy height dataset
+    :param cbh_path: path to canopy base height (CBH) dataset
+    :param cbd_path: path to canopy bulk density (CBD) dataset
+    :return: None
+    """
+    def _updateLCP_Bands(file_path: str):
+        band_names = ['elev', 'slope', 'aspect', 'fbfm', 'cnpy_cvr', 'cnpy_ht', 'cbh', 'cbd']
+        with rio.open(file_path, 'r+') as dst:
+            # Ensure there are 8 bands before assigning descriptions
+            if dst.count == 8:
+                # Explicitly set band descriptions
+                for i, desc in enumerate(band_names, start=1):
+                    dst.set_band_description(i, desc)  # Use explicit method
+
+                # Alternatively, try updating tags (some drivers may require this)
+                dst.update_tags(1, DESCRIPTIONS=','.join(band_names))
+            else:
+                print(f'\t\tSkipping band name assignments: Expected 8 bands, found {dst.count}.')
+
+    print(f'Generating LCP file at {lcp_file}')
+
+    # Generate raster and band names lists
+    rasters = [elev_path, slope_path, aspect_path, fbfm_path, cc_path, ch_path, cbh_path, cbd_path]
+
+    # Make sure all input rasters exist
+    for ras in rasters:
+        if not os.path.exists(ras):
+            raise FileNotFoundError(f'\tInput raster not found: {ras}')
+
+    # Create temporary VRT path
+    vrt_path = lcp_file.replace('.tif', '.vrt')
+
+    print('\tCreating VRT from rasters...')
+    vrt_cmd = [
+                  'gdalbuildvrt',
+                  '-separate',
+                  vrt_path
+              ] + rasters
+
+    subprocess.run(vrt_cmd, check=True)
+
+    print('\tTranslating VRT to compressed GeoTIFF...')
+    translate_cmd = [
+        'gdal_translate',
+        '-of', 'GTiff',
+        '-co', 'COMPRESS=LZW',
+        '-co', 'TILED=YES',
+        '-co', 'BLOCKXSIZE=128',
+        '-co', 'BLOCKYSIZE=128',
+        '-co', 'BIGTIFF=YES',
+        '-ot', 'Int16',
+        vrt_path,
+        lcp_file
+    ]
+
+    subprocess.run(translate_cmd, check=True)
+
+    # Clean up VRT
+    if os.path.exists(vrt_path):
+        os.remove(vrt_path)
+
+    # Update the band names in the LCP file
+    print('\tUpdating LCP file band names...')
+    _updateLCP_Bands(lcp_file)
+
+    print(f'\tLCP file complete')
 
     return
 
