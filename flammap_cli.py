@@ -107,7 +107,6 @@ def genLCP(lcp_file: str,
     # Open all rasters and read as masked arrays
     rasters = [elev_path, slope_path, aspect_path, fbfm_path, cc_path, ch_path, cbh_path, cbd_path]
     band_names = ['elev', 'slope', 'aspect', 'fbfm', 'cnpy_cvr', 'cnpy_ht', 'cbh', 'cbd']
-    band_dtypes = ['int16', 'int16', 'int16', 'uint8', 'int16', 'int16', 'int16', 'int16']
 
     # Read metadata from the reference raster
     with rio.open(elev_path) as ref_ras:
