@@ -1195,10 +1195,12 @@ def appTest(app_selection: str) -> None:
     else:
         raise ValueError(f'Invalid application selection: Must be one of: {", ".join(app_name_dict.keys())}')
 
+    return
+
 
 if __name__ == '__main__':
     # Choose app to test the Missoula Fire Lab Command Line Applications
-    _app_selection = 'Farsite'  # Options: 'FlamMap', 'MTT', Farsite'
+    _app_selection = 'Farsite'  # Options: 'FlamMap', 'MTT', 'Farsite'
 
     # Test the application
     appTest(app_selection=_app_selection)
