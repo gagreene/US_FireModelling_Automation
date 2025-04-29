@@ -14,15 +14,11 @@
 ## Requirements
 
 - Python 3.6+
-- Modules: `os`, `glob`, `subprocess`, `rasterio`, `typing`, `requests` (for `downloadApps` function), `shutil` (for file operations), and `zipfile` (for handling zip files).
+- Modules: `os`, `glob`, `subprocess`, `rasterio`, `typing`, `requests`, `psutil`, `zipfile`.
 
 ## Installation
 
-With pip...
-```bash
-pip install -r requirements.txt
-```
-With Conda (recommended)...
+With Conda...
 - for Windows:
 ```bash
 conda create --name myenv --file conda-spec-file-windows.txt
