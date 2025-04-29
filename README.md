@@ -21,6 +21,15 @@
 ```bash
 pip install -r requirements.txt
 ```
+or if using Conda...
+for Windows:
+```bash
+conda create --name myenv --file conda-spec-file-windows.txt
+```
+for Ubuntu:
+```bash
+conda create --name myenv --file conda-spec-file-ubuntu.txt
+```
 
 ## Usage
 
