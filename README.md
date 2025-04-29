@@ -27,7 +27,7 @@ With Conda (recommended)...
 ```bash
 conda create --name myenv --file conda-spec-file-windows.txt
 ```
-- for Ubuntu:
+- for Ubuntu (coming soon):
 ```bash
 conda create --name myenv --file conda-spec-file-ubuntu.txt
 ```
