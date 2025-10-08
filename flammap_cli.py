@@ -333,7 +333,7 @@ def genCommandFile(out_path: str,
     try:
         file = open(out_path, 'w')
         for row in command_list:
-            file.write(f'{row[0]} {row[1]} {row[2]} {row[3]} {row[4]} {row[5]}\n')
+            file.write(' '.join(map(str, row)) + '\n')
         file.close()
         if not suppress_messages:
             print('Command file complete')
