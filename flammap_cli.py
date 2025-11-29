@@ -348,7 +348,6 @@ def genInputFile(
         out_name: str,
         suppress_messages: bool = False,
         app_select: str = 'FlamMap',
-        output_list: Optional[list] = None,
         cond_period_end: Optional[str] = None,
         fuel_moisture_data: Optional[Union[list[int, str], tuple[int, str]]] = None,
         custom_fuels_file: Optional[str] = None,
@@ -420,8 +419,6 @@ def genInputFile(
     :param suppress_messages: if True, do not print messages from this function
     :param app_select: The name of the selected fire modelling application.
         Options are "FlamMap", "MTT", "TOM", "Farsite". Default = "FlamMap".
-    :param output_list: List of requested output datasets. If left blank, default values will be used based on
-        the app_select variable
     :param cond_period_end: The month, day and military time of end of conditioning period.
     :param fuel_moisture_data: List[0] The number of fuel model entries, and List[1] the actual Wind Data records.
         NOTE: Fuel Model 0 is required! This is the default moistures to use when a fuel model is
@@ -564,10 +561,8 @@ def genInputFile(
     :param far_ros_adjust_file: The name of the rate of spread adjustment file to use.
     :return: the path to the resulting input file
 
-    **output_list**
-        The following outputs are available for each App as described...
-
-        * Note: At least one VALID output switch is mandatory. One switch per line is allowed in the inputs file.
+    **DESCRIPTION OF OUTPUTS**
+        The following outputs are generaated for each App as described...
 
         All Apps:
             FLAMELENGTH (raster grid)
@@ -686,8 +681,6 @@ def genInputFile(
                 information regarding the system on which the model was run, the number of
                 vertices (not cells) on the edge of the landscape that burned, as well as the
                 amount of time that it took the FARSITE model to complete
-        Default Outputs (if output_list is None):
-            FLAMELENGTH, SPREADRATE, INTENSITY, HEATAREA, CROWNSTATE
 
     **cond_period_end**
         Example:
@@ -1080,20 +1073,6 @@ def genInputFile(
                 if far_ros_adjust_file:
                     file.write(f'ROS_ADJUST_FILE: {far_ros_adjust_file}\n')
                 file.write('\n')
-
-            # Implement Output Switches
-            file.write('#REQUESTED OUTPUTS\n')
-            if output_list:
-                # Write user provided outputs
-                for output in output_list:
-                    file.write(f'{output}:\n')
-            else:
-                # Write default outputs
-                file.write('FLAMELENGTH:\n'
-                           'SPREADRATE:\n'
-                           'INTENSITY:\n'
-                           'HEATAREA:\n'
-                           'CROWNSTATE\n')
 
         if not suppress_messages:
             print('Input file complete')
