@@ -1,6 +1,12 @@
-import os
-from tarfile import data_filter
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Nov 29 12:30:00 2025
 
+@author: Gregory A. Greene
+"""
+__author__ = ['Gregory A. Greene, map.n.trowel@gmail.com']
+
+import os
 import pandas as pd
 import flammap_cli as fm
 
