@@ -15,7 +15,7 @@ from numpy import histogram
 from numpy.ma import masked_equal
 from typing import Union, Optional
 
-supplementary_path = os.path.join(os.path.dirname(__file__), 'Supplementary_Data')
+supplementary_path = os.path.join(os.path.dirname(__file__), 'supplementary_data')
 fb_path = os.path.join(supplementary_path, 'FB')
 bin_path = os.path.join(fb_path, 'bin')
 
@@ -344,7 +344,7 @@ def genCommandFile(out_path: str,
 
 
 def genInputFile(
-        out_folder: str,
+        out_dir: str,
         out_name: str,
         suppress_messages: bool = False,
         app_select: str = 'FlamMap',
@@ -415,7 +415,7 @@ def genInputFile(
 ) -> str:
     """
     Function to generate a FlamMap, MTT, TOM, or Farsite input file.
-    :param out_folder: Path to output folder
+    :param out_dir: Path to output folder
     :param out_name: Name of the input file
     :param suppress_messages: if True, do not print messages from this function
     :param app_select: The name of the selected fire modelling application.
@@ -923,7 +923,7 @@ def genInputFile(
         print(f'\n<<<<< [flammap_cli.py] Generating {app_select} Input File >>>>>')
 
     # Delete existing output file
-    out_path = os.path.join(out_folder, f'{out_name}.input')
+    out_path = os.path.join(out_dir, f'{out_name}.input')
     if os.path.exists(out_path):
         os.remove(out_path)
 
@@ -1118,7 +1118,7 @@ def runApp(app_select: str,
     :param suppress_messages: suppress intermediate print statements during program execution
     :return: A tuple containing the standard output messages, and the CLI app errors
     """
-    # Check if the FB folder exists within the Supplementary_Data folder
+    # Check if the FB folder exists within the supplementary_data folder
     # If not, download the application data
     if not os.path.exists(fb_path):
         downloadApps()
