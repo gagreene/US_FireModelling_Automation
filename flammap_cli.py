@@ -38,7 +38,79 @@ app_exe_dict = {
 }
 
 
-def downloadApps() -> None:
+def _build_app_env() -> dict:
+    """Build an isolated environment required by the vendor executables."""
+    env = os.environ.copy()
+    env['PATH'] = f'{bin_path};{env.get("PATH", "")}'
+    env['GDAL_DATA'] = os.path.join(fb_path, 'share', 'gdal')
+    env['PROJ_LIB'] = os.path.join(fb_path, 'share', 'proj')
+    env['WINDNINJA_DATA'] = os.path.join(fb_path, 'share', 'windninja')
+    env.pop('GDAL_DRIVER_PATH', None)
+    return env
+
+def _write_rows(file, rows):
+    for row in rows:
+        file.write(' '.join(str(value) for value in row) + '\n')
+
+def app_test(app_selection: str) -> None:
+    """
+    Function to run the Missoula Fire Lab Command Line Application test datasets
+    :param app_selection: The name of the selected fire modelling application.
+        Options are "FlamMap", "MTT", "TOM", "Farsite", "Randig", "FSPro".
+        Default = "FlamMap".
+    :return: None
+    """
+    app_testData_dict = {
+        'FlamMap': os.path.join(fb_path, 'sampledata', 'FlamMap'),
+        'MTT': os.path.join(fb_path, 'sampledata', 'MTT'),
+        'TOM': os.path.join(fb_path, 'sampledata', 'MTT'),
+        'Farsite': os.path.join(fb_path, 'sampledata', 'Farsite'),
+    }
+
+    # Randig and FSPro take positional CLI args. Both sample datasets share
+    # the landscape and ignition files in the BlueMountain sample folder.
+    blue_mountain_dir = os.path.join(fb_path, 'sampledata', 'BlueMountain')
+    app_directArgs_dict = {
+        'Randig': [
+            os.path.join(blue_mountain_dir, 'BlueMountain.tif'),
+            os.path.join(fb_path, 'sampledata', 'Randig', 'RandigInputs.txt'),
+            os.path.join(fb_path, 'sampledata', 'Randig', 'out', 'test'),
+        ],
+        'FSPro': [
+            os.path.join(blue_mountain_dir, 'BlueMountain.tif'),
+            os.path.join(fb_path, 'sampledata', 'FSPro', 'FSProInputs.txt'),
+            os.path.join(fb_path, 'sampledata', 'FSPro', 'out', 'test'),
+            os.path.join(blue_mountain_dir, 'centerIgnit.shp'),
+            '0',
+        ],
+    }
+
+    if app_selection in app_directArgs_dict:
+        run_app(app_selection, app_directArgs_dict[app_selection])
+        return
+
+    # Get the test application path
+    test_data_path = app_testData_dict.get(app_selection, None)
+
+    if test_data_path is not None:
+        command_file_matches = (
+            glob.glob(os.path.join(test_data_path, '*Command.txt'))
+            or glob.glob(os.path.join(test_data_path, '*Cmd.txt'))
+        )
+        if not command_file_matches:
+            raise FileNotFoundError(
+                f'No command file (*Command.txt or *Cmd.txt) found in {test_data_path}'
+            )
+        command_file_path = command_file_matches[0]
+
+        # Run the application
+        run_app(app_selection, command_file_path)
+    else:
+        raise ValueError(f'Invalid application selection: Must be one of: {", ".join(app_name_dict.keys())}')
+
+    return
+
+def download_apps() -> None:
     import requests
     import shutil
     import zipfile
@@ -46,7 +118,7 @@ def downloadApps() -> None:
     # The URL of the zip file
     data_url = 'https://www.alturassolutions.com/FB/FireBehaviorModels.zip'
 
-    # Do not create fb_path yet: runApp() uses its existence to decide whether
+    # Do not create fb_path yet: run_app() uses its existence to decide whether
     # to retry a download after a failure.
     os.makedirs(supplementary_path, exist_ok=True)
 
@@ -81,244 +153,7 @@ def downloadApps() -> None:
 
     return
 
-
-def genLCP(lcp_file: str,
-           elev_path: str,
-           slope_path: str,
-           aspect_path: str,
-           fbfm_path: str,
-           cc_path: str,
-           ch_path: str,
-           cbh_path: str,
-           cbd_path: str) -> None:
-    """
-    Generate a compressed, tiled, multiband GeoTIFF file suitable for use as a Landscape (LCP) file,
-    by stacking 8 raster tif file inputs. Results are not as compressed as the genLCP_gdal function.
-
-    :param lcp_file: path to output lcp file
-    :param elev_path: path to elevation dataset
-    :param slope_path: path to slope dataset (degrees)
-    :param aspect_path: path to aspect dataset (degrees)
-    :param fbfm_path: path to fire behavior fuel model (FBFM) dataset
-    :param cc_path: path to canopy cover dataset
-    :param ch_path: path to canopy height dataset
-    :param cbh_path: path to canopy base height (CBH) dataset
-    :param cbd_path: path to canopy bulk density (CBD) dataset
-    :return: None
-    """
-    print(f'Generating LCP file at {lcp_file}')
-
-    # Generate raster and band names lists
-    rasters = [elev_path, slope_path, aspect_path, fbfm_path, cc_path, ch_path, cbh_path, cbd_path]
-    band_names = ['elev', 'slope', 'aspect', 'fbfm', 'cnpy_cvr', 'cnpy_ht', 'cbh', 'cbd']
-
-    # Read metadata from the reference raster
-    with rio.open(elev_path) as ref_ras:
-        ref_shape = ref_ras.shape
-        out_meta = ref_ras.meta.copy()
-
-    # Update metadata for the output GeoTIFF
-    out_meta.update({
-        'count': 8,         # 8 output bands
-        'dtype': 'int16',   # 16-bit integer format
-        'nodata': -999,     # Nodata value for all bands
-        'compress': 'DEFLATE',  # Compression method
-        'zlevel': 9,        # Compression level (0-9)
-        'predictor': 2,     # Improve compression for continuous data
-        'tiled': True,      # Enable tiling for efficient access
-        'blockxsize': 128,  # Tile width
-        'blockysize': 128,  # Tile height
-        'BIGTIFF': 'YES'    # Support >4GB output files
-    })
-
-    # Write data to output LCP file
-    print('\tSaving LCP file')
-    with rio.open(lcp_file, 'w', **out_meta) as dst:
-        # Loop through each input raster and corresponding band name
-        for band, (path, desc) in enumerate(zip(rasters, band_names), start=1):
-            with rio.open(path) as src:
-                # Read and convert to int16 to match output dtype
-                arr = src.read(1).astype('int16')
-
-                # Replace input nodata values with unified -999
-                nodata_value = src.nodata
-                if nodata_value is not None:
-                    arr[arr == nodata_value] = -999
-
-                # Check shape consistency with the reference raster
-                if arr.shape != ref_shape:
-                    raise ValueError(f'Raster size mismatch in {path}. Expected {ref_shape}, got {arr.shape}')
-
-                # Write the current band to the output file
-                dst.write(arr, band)
-
-                # Set band description (e.g., 'elev', 'slope', ...)
-                dst.set_band_description(band, desc)
-
-                # Mask nodata values before computing statistics
-                arr_masked = masked_equal(arr, -999)
-
-                # Compute and write basic stats as band-level metadata
-                stats = {
-                    'min': float(arr_masked.min()),
-                    'max': float(arr_masked.max()),
-                    'mean': float(arr_masked.mean()),
-                    'std': float(arr_masked.std())
-                }
-                dst.update_tags(band, **stats)
-
-                # Compute histogram (256 bins) and store as comma-separated string
-                hist, bin_edges = histogram(arr_masked.compressed(), bins=256)
-                dst.update_tags(band, histogram=','.join(map(str, hist.tolist())))
-
-        # Add overall description tag to the first band
-        dst.update_tags(1, DESCRIPTIONS=','.join(band_names))
-
-    print(f'\tLCP file complete')
-
-    return
-
-
-def genLCP_gdal(lcp_file: str,
-                elev_path: str,
-                slope_path: str,
-                aspect_path: str,
-                fbfm_path: str,
-                cc_path: str,
-                ch_path: str,
-                cbh_path: str,
-                cbd_path: str) -> None:
-    """
-    Generate a compressed, tiled, multiband GeoTIFF file suitable for use as a Landscape (LCP) file,
-    by stacking 8 raster layers using GDAL's VRT (Virtual Raster) and Translate functions.
-
-    This function mimics the output structure and compression (size) used by ArcGIS Pro when using the Composite Bands
-    tool to export stacked rasters to multi-band TIFF format with LZW compression.
-
-    :param lcp_file: path to output lcp file
-    :param elev_path: path to elevation dataset
-    :param slope_path: path to slope dataset (degrees)
-    :param aspect_path: path to aspect dataset (degrees)
-    :param fbfm_path: path to fire behavior fuel model (FBFM) dataset
-    :param cc_path: path to canopy cover dataset
-    :param ch_path: path to canopy height dataset
-    :param cbh_path: path to canopy base height (CBH) dataset
-    :param cbd_path: path to canopy bulk density (CBD) dataset
-    :return: None
-    """
-    def _updateLCP_Bands(file_path: str):
-        band_names = ['elev', 'slope', 'aspect', 'fbfm', 'cnpy_cvr', 'cnpy_ht', 'cbh', 'cbd']
-        with rio.open(file_path, 'r+') as dst:
-            # Ensure there are 8 bands before assigning descriptions
-            if dst.count == 8:
-                # Explicitly set band descriptions
-                for i, desc in enumerate(band_names, start=1):
-                    dst.set_band_description(i, desc)  # Use explicit method
-
-                # Alternatively, try updating tags (some drivers may require this)
-                dst.update_tags(1, DESCRIPTIONS=','.join(band_names))
-            else:
-                print(f'\t\tSkipping band name assignments: Expected 8 bands, found {dst.count}.')
-
-    print(f'Generating LCP file at {lcp_file}')
-
-    # Generate raster and band names lists
-    rasters = [elev_path, slope_path, aspect_path, fbfm_path, cc_path, ch_path, cbh_path, cbd_path]
-
-    # Make sure all input rasters exist
-    for ras in rasters:
-        if not os.path.exists(ras):
-            raise FileNotFoundError(f'\tInput raster not found: {ras}')
-
-    # Create temporary VRT path
-    vrt_path = lcp_file.replace('.tif', '.vrt')
-
-    print('\tCreating VRT from rasters...')
-    vrt_cmd = [
-                  'gdalbuildvrt',
-                  '-separate',
-                  vrt_path
-              ] + rasters
-
-    subprocess.run(vrt_cmd, check=True)
-
-    print('\tTranslating VRT to compressed GeoTIFF...')
-    translate_cmd = [
-        'gdal_translate',
-        '-of', 'GTiff',
-        '-co', 'COMPRESS=LZW',
-        '-co', 'TILED=YES',
-        '-co', 'BLOCKXSIZE=128',
-        '-co', 'BLOCKYSIZE=128',
-        '-co', 'BIGTIFF=YES',
-        '-ot', 'Int16',
-        vrt_path,
-        lcp_file
-    ]
-
-    subprocess.run(translate_cmd, check=True)
-
-    # Clean up VRT
-    if os.path.exists(vrt_path):
-        os.remove(vrt_path)
-
-    # Update the band names in the LCP file
-    print('\tUpdating LCP file band names...')
-    _updateLCP_Bands(lcp_file)
-
-    print(f'\tLCP file complete')
-
-    return
-
-
-def getRawsTextFile(in_path: str) -> tuple[int, str]:
-    """
-    Extracts contents from a text file containing RAWS-formatted weather data, and
-    returns a tuple containing the length of the data, and a string representation of the data.
-
-    :param in_path: Path to the text file.
-    :return: Number of lines, and a formatted string containing the contents of the text file.
-    """
-    lines = None
-    contents = None
-    try:
-        with open(in_path, 'r') as reader:
-            data = reader.read().rstrip('\n')
-        with open(in_path, 'w') as writer:
-            zero_line = data.split('\n')[0]
-            first_fbfm = zero_line.split(' ')[0]
-            zero_line = zero_line.replace(first_fbfm, '0', 1)
-            writer.write(f'{zero_line}\n{data}')
-        with open(in_path, 'r') as file:
-            contents = file.read()
-            # contents.replace('\n\n', '\n')
-            lines = len(contents.split('\n'))
-    except FileNotFoundError:
-        print('The data directory does not exist')
-
-    return lines, contents
-
-
-def genWeatherString(weather_list: list[list]) -> tuple[int, str]:
-    """
-    Converts a list of lists of properly formatted weather data, and returns a tuple containing the
-    length of the list, and a string representation of the data.
-    This function is intended to be used if passing data from a Pandas DataFrame or array that has been
-    converted to a list of lists. Do not include column names, only the data.
-
-    :param weather_list: A list of lists containing properly formatted weather data.
-    :return: A tuple with the length of the list and the formatted string.
-    """
-    if not all(isinstance(sublist, list) for sublist in weather_list):
-        raise ValueError('Input must be a list of lists.')
-
-    list_length = len(weather_list)
-    formatted_string = '\n'.join(' '.join(map(str, sublist)) for sublist in sorted(weather_list))
-
-    return list_length, formatted_string
-
-
-def genCommandFile(out_path: str,
+def gen_command_file(out_path: str,
                    command_list:  list[list[Union[str, int]]],
                    suppress_messages: bool = False) -> None:
     """
@@ -345,8 +180,35 @@ def genCommandFile(out_path: str,
 
     return
 
+def gen_fspro_input_file(out_dir: str, out_name: str, duration: int, num_fires: int, max_lag: int,
+                      poly_degree: int, calm_value: Union[int,float], wind_directions: list,
+                      wind_speeds: list, wind_cell_values: list, erc_classes: list,
+                      historic_erc_values: list, avg_erc_values: list, stddev_erc_values: list,
+                      current_erc_values: list, forecast: Optional[list] = None, *, barrier_fill: int = 0,
+                      resolution: Optional[Union[int,float]] = None, crown_fire_method: str = 'Finney',
+                      save_perimeters: int = 1, suppress_messages: bool = False) -> str:
+    """Write an FSPro input file from validated scalar, matrix, and ERC series data."""
+    if not os.path.isdir(out_dir): raise FileNotFoundError(out_dir)
+    if num_fires <= 0 or duration <= 0 or crown_fire_method not in ('Finney','ScottRheinhardt'): raise ValueError('Invalid FSPro controls')
+    if barrier_fill not in (0,1) or save_perimeters not in (0,1): raise ValueError('FSPro flags must be 0 or 1')
+    if not wind_directions or not wind_speeds or len(wind_cell_values)!=len(wind_speeds) or any(len(row)!=len(wind_directions) for row in wind_cell_values): raise ValueError('Invalid wind matrix')
+    if any(len(row)!=10 for row in erc_classes): raise ValueError('Each ERC class must have 10 values')
+    if not historic_erc_values or any(len(row)!=len(historic_erc_values[0]) for row in historic_erc_values): raise ValueError('Historic ERC years must have equal length')
+    if len(avg_erc_values)!=len(historic_erc_values[0]) or len(stddev_erc_values)!=len(historic_erc_values[0]): raise ValueError('ERC summary lengths must match weather records')
+    path=os.path.join(out_dir,out_name+'.input')
+    with open(path,'w',newline='\n') as file:
+        file.write('#FSPro Model Inputs\n#FSPro Assorted Inputs\n')
+        for key,value in [('Duration',duration),('NumFires',num_fires),('MaxLag',max_lag),('PolyDegree',poly_degree),('BarrierFill',barrier_fill),('Resolution',resolution),('CROWN_FIRE_METHOD',crown_fire_method),('SavePerimeters',save_perimeters)]:
+            if value is not None: file.write(f'{key}: {value}\n')
+        file.write('\n#Wind Parameters (required)\nCalmValue: %s\nNumWindDirs: %s\n%s\nNumWindSpeeds: %s\n%s\nWindCellValues:\n' % (calm_value,len(wind_directions),' '.join(map(str,wind_directions)),len(wind_speeds),' '.join(map(str,wind_speeds))))
+        _write_rows(file,wind_cell_values); file.write('\n#ERC Classes (required)\nNumERCClasses: %s\n' % len(erc_classes)); _write_rows(file,erc_classes)
+        file.write('\n#Historical ERC Stream (required)\nNumERCYears: %s\nNumWxPerYear: %s\nHistoricERCValues:\n' % (len(historic_erc_values),len(historic_erc_values[0]))); _write_rows(file,historic_erc_values)
+        file.write('\nAvgERCValues:\n%s\nStdDevERCValues:\n%s\n\n#Current ERC Stream (required)\nNumWxCurrYear: %s\nCurrentERCValues:\n%s\n' % (' '.join(map(str,avg_erc_values)),' '.join(map(str,stddev_erc_values)),len(current_erc_values),' '.join(map(str,current_erc_values))))
+        if forecast is not None: file.write('\n#Forecast (optional)\nNumForecast: %s\n' % len(forecast)); _write_rows(file,forecast)
+    if not suppress_messages: print(f'FSPro input file complete: {path}')
+    return path
 
-def genInputFile(
+def gen_input_file(
         out_dir: str,
         out_name: str,
         suppress_messages: bool = False,
@@ -1086,19 +948,280 @@ def genInputFile(
 
     return out_path
 
+def gen_lcp(lcp_file: str,
+           elev_path: str,
+           slope_path: str,
+           aspect_path: str,
+           fbfm_path: str,
+           cc_path: str,
+           ch_path: str,
+           cbh_path: str,
+           cbd_path: str) -> None:
+    """
+    Generate a compressed, tiled, multiband GeoTIFF file suitable for use as a Landscape (LCP) file,
+    by stacking 8 raster tif file inputs. Results are not as compressed as the gen_lcp_gdal function.
 
-def _buildAppEnv() -> dict:
-    """Build an isolated environment required by the vendor executables."""
-    env = os.environ.copy()
-    env['PATH'] = f'{bin_path};{env.get("PATH", "")}'
-    env['GDAL_DATA'] = os.path.join(fb_path, 'share', 'gdal')
-    env['PROJ_LIB'] = os.path.join(fb_path, 'share', 'proj')
-    env['WINDNINJA_DATA'] = os.path.join(fb_path, 'share', 'windninja')
-    env.pop('GDAL_DRIVER_PATH', None)
-    return env
+    :param lcp_file: path to output lcp file
+    :param elev_path: path to elevation dataset
+    :param slope_path: path to slope dataset (degrees)
+    :param aspect_path: path to aspect dataset (degrees)
+    :param fbfm_path: path to fire behavior fuel model (FBFM) dataset
+    :param cc_path: path to canopy cover dataset
+    :param ch_path: path to canopy height dataset
+    :param cbh_path: path to canopy base height (CBH) dataset
+    :param cbd_path: path to canopy bulk density (CBD) dataset
+    :return: None
+    """
+    print(f'Generating LCP file at {lcp_file}')
 
+    # Generate raster and band names lists
+    rasters = [elev_path, slope_path, aspect_path, fbfm_path, cc_path, ch_path, cbh_path, cbd_path]
+    band_names = ['elev', 'slope', 'aspect', 'fbfm', 'cnpy_cvr', 'cnpy_ht', 'cbh', 'cbd']
 
-def runApp(app_select: str,
+    # Read metadata from the reference raster
+    with rio.open(elev_path) as ref_ras:
+        ref_shape = ref_ras.shape
+        out_meta = ref_ras.meta.copy()
+
+    # Update metadata for the output GeoTIFF
+    out_meta.update({
+        'count': 8,         # 8 output bands
+        'dtype': 'int16',   # 16-bit integer format
+        'nodata': -999,     # Nodata value for all bands
+        'compress': 'DEFLATE',  # Compression method
+        'zlevel': 9,        # Compression level (0-9)
+        'predictor': 2,     # Improve compression for continuous data
+        'tiled': True,      # Enable tiling for efficient access
+        'blockxsize': 128,  # Tile width
+        'blockysize': 128,  # Tile height
+        'BIGTIFF': 'YES'    # Support >4GB output files
+    })
+
+    # Write data to output LCP file
+    print('\tSaving LCP file')
+    with rio.open(lcp_file, 'w', **out_meta) as dst:
+        # Loop through each input raster and corresponding band name
+        for band, (path, desc) in enumerate(zip(rasters, band_names), start=1):
+            with rio.open(path) as src:
+                # Read and convert to int16 to match output dtype
+                arr = src.read(1).astype('int16')
+
+                # Replace input nodata values with unified -999
+                nodata_value = src.nodata
+                if nodata_value is not None:
+                    arr[arr == nodata_value] = -999
+
+                # Check shape consistency with the reference raster
+                if arr.shape != ref_shape:
+                    raise ValueError(f'Raster size mismatch in {path}. Expected {ref_shape}, got {arr.shape}')
+
+                # Write the current band to the output file
+                dst.write(arr, band)
+
+                # Set band description (e.g., 'elev', 'slope', ...)
+                dst.set_band_description(band, desc)
+
+                # Mask nodata values before computing statistics
+                arr_masked = masked_equal(arr, -999)
+
+                # Compute and write basic stats as band-level metadata
+                stats = {
+                    'min': float(arr_masked.min()),
+                    'max': float(arr_masked.max()),
+                    'mean': float(arr_masked.mean()),
+                    'std': float(arr_masked.std())
+                }
+                dst.update_tags(band, **stats)
+
+                # Compute histogram (256 bins) and store as comma-separated string
+                hist, bin_edges = histogram(arr_masked.compressed(), bins=256)
+                dst.update_tags(band, histogram=','.join(map(str, hist.tolist())))
+
+        # Add overall description tag to the first band
+        dst.update_tags(1, DESCRIPTIONS=','.join(band_names))
+
+    print(f'\tLCP file complete')
+
+    return
+
+def gen_lcp_gdal(lcp_file: str,
+                elev_path: str,
+                slope_path: str,
+                aspect_path: str,
+                fbfm_path: str,
+                cc_path: str,
+                ch_path: str,
+                cbh_path: str,
+                cbd_path: str) -> None:
+    """
+    Generate a compressed, tiled, multiband GeoTIFF file suitable for use as a Landscape (LCP) file,
+    by stacking 8 raster layers using GDAL's VRT (Virtual Raster) and Translate functions.
+
+    This function mimics the output structure and compression (size) used by ArcGIS Pro when using the Composite Bands
+    tool to export stacked rasters to multi-band TIFF format with LZW compression.
+
+    :param lcp_file: path to output lcp file
+    :param elev_path: path to elevation dataset
+    :param slope_path: path to slope dataset (degrees)
+    :param aspect_path: path to aspect dataset (degrees)
+    :param fbfm_path: path to fire behavior fuel model (FBFM) dataset
+    :param cc_path: path to canopy cover dataset
+    :param ch_path: path to canopy height dataset
+    :param cbh_path: path to canopy base height (CBH) dataset
+    :param cbd_path: path to canopy bulk density (CBD) dataset
+    :return: None
+    """
+    def _update_lcp_bands(file_path: str):
+        band_names = ['elev', 'slope', 'aspect', 'fbfm', 'cnpy_cvr', 'cnpy_ht', 'cbh', 'cbd']
+        with rio.open(file_path, 'r+') as dst:
+            # Ensure there are 8 bands before assigning descriptions
+            if dst.count == 8:
+                # Explicitly set band descriptions
+                for i, desc in enumerate(band_names, start=1):
+                    dst.set_band_description(i, desc)  # Use explicit method
+
+                # Alternatively, try updating tags (some drivers may require this)
+                dst.update_tags(1, DESCRIPTIONS=','.join(band_names))
+            else:
+                print(f'\t\tSkipping band name assignments: Expected 8 bands, found {dst.count}.')
+
+    print(f'Generating LCP file at {lcp_file}')
+
+    # Generate raster and band names lists
+    rasters = [elev_path, slope_path, aspect_path, fbfm_path, cc_path, ch_path, cbh_path, cbd_path]
+
+    # Make sure all input rasters exist
+    for ras in rasters:
+        if not os.path.exists(ras):
+            raise FileNotFoundError(f'\tInput raster not found: {ras}')
+
+    # Create temporary VRT path
+    vrt_path = lcp_file.replace('.tif', '.vrt')
+
+    print('\tCreating VRT from rasters...')
+    vrt_cmd = [
+                  'gdalbuildvrt',
+                  '-separate',
+                  vrt_path
+              ] + rasters
+
+    subprocess.run(vrt_cmd, check=True)
+
+    print('\tTranslating VRT to compressed GeoTIFF...')
+    translate_cmd = [
+        'gdal_translate',
+        '-of', 'GTiff',
+        '-co', 'COMPRESS=LZW',
+        '-co', 'TILED=YES',
+        '-co', 'BLOCKXSIZE=128',
+        '-co', 'BLOCKYSIZE=128',
+        '-co', 'BIGTIFF=YES',
+        '-ot', 'Int16',
+        vrt_path,
+        lcp_file
+    ]
+
+    subprocess.run(translate_cmd, check=True)
+
+    # Clean up VRT
+    if os.path.exists(vrt_path):
+        os.remove(vrt_path)
+
+    # Update the band names in the LCP file
+    print('\tUpdating LCP file band names...')
+    _update_lcp_bands(lcp_file)
+
+    print(f'\tLCP file complete')
+
+    return
+
+def gen_randig_input_file(out_dir: str, out_name: str, num_fires: int, duration: int,
+                       spot_probability: float, *, resolution: Optional[Union[int, float]] = None,
+                       spotting_seed: Optional[int] = None, mtt_spot_delay: Optional[int] = None,
+                       target_burn_proportion: Optional[float] = None,
+                       minimum_number_fires: Optional[int] = None,
+                       fuel_moisture_data: Optional[Union[list, tuple]] = None,
+                       foliar_moisture_content: Union[int, float] = 100,
+                       crown_fire_method: str = 'ScottReinhardt',
+                       wind_speed: Union[int, float] = 15,
+                       wind_direction: Union[int, float] = 270,
+                       spread_direction_from_max: Union[int, float] = 0,
+                       gridded_winds_generate: Optional[str] = None,
+                       gridded_winds_resolution: Optional[Union[int, float]] = None,
+                       raws_elevation: Optional[Union[int, float]] = None,
+                       raws_units: Optional[str] = None, raws_data: Optional[Union[list, tuple]] = None,
+                       conditioning_period_end: Optional[str] = None,
+                       suppress_messages: bool = False) -> str:
+    """Write a Randig input file; landscape and output paths are run_app arguments."""
+    if not os.path.isdir(out_dir): raise FileNotFoundError(out_dir)
+    if num_fires <= 0 or duration <= 0 or not 0 <= spot_probability <= 1: raise ValueError('Invalid Randig run controls')
+    if target_burn_proportion is not None and not 0 <= target_burn_proportion <= 1: raise ValueError('target_burn_proportion must be in [0, 1]')
+    if crown_fire_method != 'ScottReinhardt': raise ValueError('Randig crown_fire_method must be ScottReinhardt')
+    if fuel_moisture_data is not None and len(fuel_moisture_data) != 2: raise ValueError('fuel_moisture_data must contain count and rows')
+    path=os.path.join(out_dir, out_name + '.input')
+    with open(path, 'w', newline='\n') as file:
+        file.write('#Randig-Inputs-File-Version-1\n\nNUMFIRES: %s\n\nDURATION: %s\nSPOTPROBABILITY: %s\n' % (num_fires,duration,spot_probability))
+        for key,value in [('SPOTTING_SEED',spotting_seed),('MTT_SPOT_DELAY',mtt_spot_delay),('MINIMUMNUMBERFIRES',minimum_number_fires),('TARGETBURNPROPORTION',target_burn_proportion),('RESOLUTION',resolution)]:
+            if value is not None: file.write(f'{key}: {value}\n')
+        if conditioning_period_end is not None: file.write(f'CONDITIONING_PERIOD_END: {conditioning_period_end}\n')
+        if fuel_moisture_data is not None: file.write(f'\nFUEL_MOISTURES_DATA: {fuel_moisture_data[0]}\n{fuel_moisture_data[1]}\n')
+        for key,value in [('RAWS_UNITS',raws_units),('RAWS_ELEVATION',raws_elevation)]:
+            if value is not None: file.write(f'{key}: {value}\n')
+        if raws_data is not None:
+            if len(raws_data)!=2: raise ValueError('raws_data must contain count and rows')
+            file.write(f'RAWS: {raws_data[0]}\n{raws_data[1]}\n')
+        file.write(f'\nFOLIAR_MOISTURE_CONTENT: {foliar_moisture_content}\nCROWN_FIRE_METHOD: {crown_fire_method}\nSPREAD_DIRECTION_FROM_MAX: {spread_direction_from_max}\nWIND_SPEED: {wind_speed}\nWIND_DIRECTION: {wind_direction}\n')
+        for key,value in [('GRIDDED_WINDS_GENERATE',gridded_winds_generate),('GRIDDED_WINDS_RESOLUTION',gridded_winds_resolution)]:
+            if value is not None: file.write(f'{key}: {value}\n')
+    if not suppress_messages: print(f'Randig input file complete: {path}')
+    return path
+
+def gen_weather_string(weather_list: list[list]) -> tuple[int, str]:
+    """
+    Converts a list of lists of properly formatted weather data, and returns a tuple containing the
+    length of the list, and a string representation of the data.
+    This function is intended to be used if passing data from a Pandas DataFrame or array that has been
+    converted to a list of lists. Do not include column names, only the data.
+
+    :param weather_list: A list of lists containing properly formatted weather data.
+    :return: A tuple with the length of the list and the formatted string.
+    """
+    if not all(isinstance(sublist, list) for sublist in weather_list):
+        raise ValueError('Input must be a list of lists.')
+
+    list_length = len(weather_list)
+    formatted_string = '\n'.join(' '.join(map(str, sublist)) for sublist in sorted(weather_list))
+
+    return list_length, formatted_string
+
+def get_raws_text_file(in_path: str) -> tuple[int, str]:
+    """
+    Extracts contents from a text file containing RAWS-formatted weather data, and
+    returns a tuple containing the length of the data, and a string representation of the data.
+
+    :param in_path: Path to the text file.
+    :return: Number of lines, and a formatted string containing the contents of the text file.
+    """
+    lines = None
+    contents = None
+    try:
+        with open(in_path, 'r') as reader:
+            data = reader.read().rstrip('\n')
+        with open(in_path, 'w') as writer:
+            zero_line = data.split('\n')[0]
+            first_fbfm = zero_line.split(' ')[0]
+            zero_line = zero_line.replace(first_fbfm, '0', 1)
+            writer.write(f'{zero_line}\n{data}')
+        with open(in_path, 'r') as file:
+            contents = file.read()
+            # contents.replace('\n\n', '\n')
+            lines = len(contents.split('\n'))
+    except FileNotFoundError:
+        print('The data directory does not exist')
+
+    return lines, contents
+
+def run_app(app_select: str,
            command_file_path: Union[str, list, tuple],
            app_exe_path: Optional[str] = None,
            suppress_messages: bool = False,
@@ -1118,7 +1241,7 @@ def runApp(app_select: str,
     # Check if the FB folder exists within the supplementary_data folder
     # If not, download the application data
     if not os.path.exists(fb_path):
-        downloadApps()
+        download_apps()
 
     if app_exe_path is None:
         # Get the name of the application executable file
@@ -1144,7 +1267,7 @@ def runApp(app_select: str,
             stderr=subprocess.PIPE,
             text=True,
             cwd=run_cwd,
-            env=_buildAppEnv()
+            env=_build_app_env()
         )
         stdout, stderr = app_cli.communicate()
         if not suppress_messages:
@@ -1172,68 +1295,9 @@ def runApp(app_select: str,
     return stdout, stderr
 
 
-def appTest(app_selection: str) -> None:
-    """
-    Function to run the Missoula Fire Lab Command Line Application test datasets
-    :param app_selection: The name of the selected fire modelling application.
-        Options are "FlamMap", "MTT", "TOM", "Farsite", "Randig", "FSPro".
-        Default = "FlamMap".
-    :return: None
-    """
-    app_testData_dict = {
-        'FlamMap': os.path.join(fb_path, 'sampledata', 'FlamMap'),
-        'MTT': os.path.join(fb_path, 'sampledata', 'MTT'),
-        'TOM': os.path.join(fb_path, 'sampledata', 'MTT'),
-        'Farsite': os.path.join(fb_path, 'sampledata', 'Farsite'),
-    }
-
-    # Randig and FSPro take positional CLI args. Both sample datasets share
-    # the landscape and ignition files in the BlueMountain sample folder.
-    blue_mountain_dir = os.path.join(fb_path, 'sampledata', 'BlueMountain')
-    app_directArgs_dict = {
-        'Randig': [
-            os.path.join(blue_mountain_dir, 'BlueMountain.tif'),
-            os.path.join(fb_path, 'sampledata', 'Randig', 'RandigInputs.txt'),
-            os.path.join(fb_path, 'sampledata', 'Randig', 'out', 'test'),
-        ],
-        'FSPro': [
-            os.path.join(blue_mountain_dir, 'BlueMountain.tif'),
-            os.path.join(fb_path, 'sampledata', 'FSPro', 'FSProInputs.txt'),
-            os.path.join(fb_path, 'sampledata', 'FSPro', 'out', 'test'),
-            os.path.join(blue_mountain_dir, 'centerIgnit.shp'),
-            '0',
-        ],
-    }
-
-    if app_selection in app_directArgs_dict:
-        runApp(app_selection, app_directArgs_dict[app_selection])
-        return
-
-    # Get the test application path
-    test_data_path = app_testData_dict.get(app_selection, None)
-
-    if test_data_path is not None:
-        command_file_matches = (
-            glob.glob(os.path.join(test_data_path, '*Command.txt'))
-            or glob.glob(os.path.join(test_data_path, '*Cmd.txt'))
-        )
-        if not command_file_matches:
-            raise FileNotFoundError(
-                f'No command file (*Command.txt or *Cmd.txt) found in {test_data_path}'
-            )
-        command_file_path = command_file_matches[0]
-
-        # Run the application
-        runApp(app_selection, command_file_path)
-    else:
-        raise ValueError(f'Invalid application selection: Must be one of: {", ".join(app_name_dict.keys())}')
-
-    return
-
-
 if __name__ == '__main__':
     # Choose app to test the Missoula Fire Lab Command Line Applications
     _app_selection = 'Farsite'  # Options: 'FlamMap', 'MTT', 'Farsite'
 
     # Test the application
-    appTest(app_selection=_app_selection)
+    app_test(app_selection=_app_selection)

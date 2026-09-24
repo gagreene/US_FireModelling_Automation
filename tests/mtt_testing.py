@@ -58,7 +58,7 @@ def create_lcp():
         lcp_input_paths.append(os.path.join(input_dir, f'{name}_UTM_resampled30m.tif'))
 
     # Generate LCP file
-    fm.genLCP(*lcp_input_paths)
+    fm.gen_lcp(*lcp_input_paths)
     return
 
 
@@ -66,23 +66,23 @@ def create_input():
     # Get burn period data
     bp_csv = os.path.join(input_dir, 'burn_periods.csv')
     bp_df = get_csv_as_df(bp_csv)
-    # Format burn period data for genInputFile() function
-    bp_data = fm.genWeatherString(bp_df.astype(int).values.tolist())
+    # Format burn period data for gen_input_file() function
+    bp_data = fm.gen_weather_string(bp_df.astype(int).values.tolist())
 
     # Get fuel moisture data
     fmoist_csv = os.path.join(input_dir, 'fuel_moisture.csv')
     fmoist_df = get_csv_as_df(fmoist_csv)
-    # Format fuel moisture data for genInputFile() function
-    fmoist_data = fm.genWeatherString(fmoist_df.astype(int).values.tolist())
+    # Format fuel moisture data for gen_input_file() function
+    fmoist_data = fm.gen_weather_string(fmoist_df.astype(int).values.tolist())
 
     # Get weather data
     wx_csv = os.path.join(input_dir, 'weather.csv')
     wx_df = get_csv_as_df(wx_csv)
-    # Format weather data for genInputFile() function
-    raws_data = fm.genWeatherString(wx_df.astype(int).values.tolist())
+    # Format weather data for gen_input_file() function
+    raws_data = fm.gen_weather_string(wx_df.astype(int).values.tolist())
 
     # Generate the input file
-    input_path = fm.genInputFile(
+    input_path = fm.gen_input_file(
         out_dir=out_dir,
         out_name='farsite_testing_input',
         suppress_messages=False,
@@ -116,7 +116,7 @@ def create_command(input_path, command_path):
     ]
 
     # Generate command file
-    fm.genCommandFile(
+    fm.gen_command_file(
         out_path=command_path,
         command_list=command_list,
         suppress_messages=False
@@ -126,7 +126,7 @@ def create_command(input_path, command_path):
 
 def run_mtt(command_path):
     # Run MTT
-    fm.runApp(
+    fm.run_app(
         app_select=app_selection,
         command_file_path=command_path,
         suppress_messages=False

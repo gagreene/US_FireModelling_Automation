@@ -43,7 +43,7 @@ def test_download_apps_uses_new_url_and_extracts_into_fb_path(tmp_path, monkeypa
     monkeypatch.setitem(sys.modules, 'shutil', types.SimpleNamespace(copyfileobj=fake_copyfileobj))
     monkeypatch.setitem(sys.modules, 'zipfile', types.SimpleNamespace(ZipFile=FakeZipFile))
 
-    fm.downloadApps()
+    fm.download_apps()
 
     assert captured['url'] == 'https://www.alturassolutions.com/FB/FireBehaviorModels.zip'
     assert os.path.normpath(captured['extract_target']) == os.path.normpath(str(fake_fb))
@@ -64,7 +64,7 @@ def test_download_apps_does_not_create_fb_path_on_failed_download(tmp_path, monk
         return FakeResponse()
 
     monkeypatch.setitem(sys.modules, 'requests', types.SimpleNamespace(get=fake_get))
-    fm.downloadApps()
+    fm.download_apps()
     assert not os.path.exists(fake_fb)
 
 
@@ -94,7 +94,7 @@ def test_app_name_dict_matches_new_vendor_exe_basenames():
     ('Farsite', 'Farsite-Inputs-File-Version-1'),
 ])
 def test_gen_input_file_writes_correct_version_header(tmp_path, app_select, expected_header):
-    out_path = fm.genInputFile(
+    out_path = fm.gen_input_file(
         out_dir=str(tmp_path), out_name='test_input', suppress_messages=True, app_select=app_select,
     )
     with open(out_path) as file:
@@ -116,8 +116,8 @@ def test_app_test_finds_command_file_named_with_command_suffix(tmp_path, monkeyp
         captured['app_select'] = app_select
         captured['path'] = command_file_path
 
-    monkeypatch.setattr(fm, 'runApp', fake_run_app)
-    fm.appTest('FlamMap')
+    monkeypatch.setattr(fm, 'run_app', fake_run_app)
+    fm.app_test('FlamMap')
     assert captured['app_select'] == 'FlamMap'
     assert os.path.normpath(captured['path']) == os.path.normpath(str(cmd_file))
 
@@ -134,8 +134,8 @@ def test_app_test_finds_command_file_named_with_cmd_suffix(tmp_path, monkeypatch
     def fake_run_app(app_select, command_file_path, **kwargs):
         captured['path'] = command_file_path
 
-    monkeypatch.setattr(fm, 'runApp', fake_run_app)
-    fm.appTest('Farsite')
+    monkeypatch.setattr(fm, 'run_app', fake_run_app)
+    fm.app_test('Farsite')
     assert os.path.normpath(captured['path']) == os.path.normpath(str(cmd_file))
 
 
@@ -144,7 +144,7 @@ def test_app_test_raises_clear_error_when_no_command_file_present(tmp_path, monk
     (fb_root / 'sampledata' / 'MTT').mkdir(parents=True)
     monkeypatch.setattr(fm, 'fb_path', str(fb_root))
     with pytest.raises(FileNotFoundError):
-        fm.appTest('MTT')
+        fm.app_test('MTT')
 
 
 def test_run_app_passes_isolated_env_to_popen(tmp_path, monkeypatch):
@@ -174,7 +174,7 @@ def test_run_app_passes_isolated_env_to_popen(tmp_path, monkeypatch):
     monkeypatch.setattr(fm.psutil, 'Process', lambda pid: FakeProcess())
     command_file = tmp_path / 'cmd.txt'
     command_file.write_text('dummy')
-    fm.runApp('FlamMap', str(command_file), app_exe_path=str(bin_root / 'runflammap.exe'), suppress_messages=True)
+    fm.run_app('FlamMap', str(command_file), app_exe_path=str(bin_root / 'runflammap.exe'), suppress_messages=True)
     env = captured['env']
     assert env is not None
     assert env['GDAL_DATA'] == os.path.join(str(fb_root), 'share', 'gdal')
@@ -227,7 +227,7 @@ def test_run_app_accepts_list_of_positional_args_for_direct_style_apps(tmp_path,
     positional_args = ['lcp.tif', 'RandigInputs.txt', os.path.join('out', 'test')]
     work_dir = str(tmp_path / 'workdir')
 
-    fm.runApp('Randig', positional_args, app_exe_path=exe_path, cwd=work_dir, suppress_messages=True)
+    fm.run_app('Randig', positional_args, app_exe_path=exe_path, cwd=work_dir, suppress_messages=True)
 
     assert captured['args'] == [exe_path] + positional_args
     assert captured['cwd'] == work_dir
@@ -242,7 +242,7 @@ def test_run_app_still_accepts_a_plain_command_file_string(tmp_path, monkeypatch
     command_file.write_text('dummy')
     exe_path = str(bin_root / 'runflammap.exe')
 
-    fm.runApp('FlamMap', str(command_file), app_exe_path=exe_path, suppress_messages=True)
+    fm.run_app('FlamMap', str(command_file), app_exe_path=exe_path, suppress_messages=True)
 
     assert captured['args'] == [exe_path, str(command_file)]
     assert os.path.normpath(captured['cwd']) == os.path.normpath(str(command_dir))
@@ -254,7 +254,7 @@ def test_run_app_preserves_positional_argument_order_for_backward_compat(tmp_pat
     command_dir.mkdir()
     command_file = command_dir / 'cmd.txt'
     command_file.write_text('dummy')
-    fm.runApp('FlamMap', str(command_file), str(bin_root / 'runflammap.exe'), True)
+    fm.run_app('FlamMap', str(command_file), str(bin_root / 'runflammap.exe'), True)
 
     assert os.path.normpath(captured['cwd']) == os.path.normpath(str(command_dir))
 
@@ -265,10 +265,10 @@ def test_app_test_builds_positional_args_for_randig(tmp_path, monkeypatch):
     (fb_root / 'sampledata' / 'Randig' / 'out').mkdir(parents=True)
     monkeypatch.setattr(fm, 'fb_path', str(fb_root))
     captured = {}
-    monkeypatch.setattr(fm, 'runApp', lambda app_select, command_file_path, **kwargs: captured.update(
+    monkeypatch.setattr(fm, 'run_app', lambda app_select, command_file_path, **kwargs: captured.update(
         app_select=app_select, args=command_file_path))
 
-    fm.appTest('Randig')
+    fm.app_test('Randig')
 
     assert captured['app_select'] == 'Randig'
     assert captured['args'] == [
@@ -284,10 +284,10 @@ def test_app_test_builds_positional_args_for_fspro(tmp_path, monkeypatch):
     (fb_root / 'sampledata' / 'FSPro' / 'out').mkdir(parents=True)
     monkeypatch.setattr(fm, 'fb_path', str(fb_root))
     captured = {}
-    monkeypatch.setattr(fm, 'runApp', lambda app_select, command_file_path, **kwargs: captured.update(
+    monkeypatch.setattr(fm, 'run_app', lambda app_select, command_file_path, **kwargs: captured.update(
         app_select=app_select, args=command_file_path))
 
-    fm.appTest('FSPro')
+    fm.app_test('FSPro')
 
     assert captured['app_select'] == 'FSPro'
     assert captured['args'] == [
@@ -307,10 +307,10 @@ def test_app_test_still_uses_command_file_path_for_flammap(tmp_path, monkeypatch
     cmd_file.write_text('dummy')
     monkeypatch.setattr(fm, 'fb_path', str(fb_root))
     captured = {}
-    monkeypatch.setattr(fm, 'runApp', lambda app_select, command_file_path, **kwargs: captured.update(
+    monkeypatch.setattr(fm, 'run_app', lambda app_select, command_file_path, **kwargs: captured.update(
         args=command_file_path))
 
-    fm.appTest('FlamMap')
+    fm.app_test('FlamMap')
 
     assert isinstance(captured['args'], str)
     assert os.path.normpath(captured['args']) == os.path.normpath(str(cmd_file))
