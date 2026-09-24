@@ -20,21 +20,21 @@ fb_path = os.path.join(supplementary_path, 'FB')
 bin_path = os.path.join(fb_path, 'bin')
 
 app_name_dict = {
-    'FlamMap': 'TestFlamMap',
-    'MTT': 'TestMTT',
-    'TOM': 'TestMTT',
-    'Farsite': 'TestFARSITE',
-    # 'FSPro': 'TestFSPro',
-    # 'SpatialFOFEM': 'TestSpatialFOFEM'
+    'FlamMap': 'runflammap',
+    'MTT': 'runmtt',
+    'TOM': 'runmtt',
+    'Farsite': 'runfarsite',
+    'Randig': 'runrandig',
+    'FSPro': 'runfspro',
 }
 
 app_exe_dict = {
-    'FlamMap': os.path.join(bin_path, 'TestFlamMap'),
-    'MTT': os.path.join(bin_path, 'TestMTT'),
-    'TOM': os.path.join(bin_path, 'TestMTT'),
-    'Farsite': os.path.join(bin_path, 'TestFARSITE'),
-    'FSPro': os.path.join(bin_path, 'TestFSPro'),
-    'SpatialFOFEM': os.path.join(bin_path, 'TestSpatialFOFEM')
+    'FlamMap': os.path.join(bin_path, 'runflammap.exe'),
+    'MTT': os.path.join(bin_path, 'runmtt.exe'),
+    'TOM': os.path.join(bin_path, 'runmtt.exe'),
+    'Farsite': os.path.join(bin_path, 'runfarsite.exe'),
+    'Randig': os.path.join(bin_path, 'runrandig.exe'),
+    'FSPro': os.path.join(bin_path, 'runfspro.exe'),
 }
 
 
@@ -44,9 +44,10 @@ def downloadApps() -> None:
     import zipfile
 
     # The URL of the zip file
-    data_url = 'https://www.alturassolutions.com/FB/FB.zip'
+    data_url = 'https://www.alturassolutions.com/FB/FireBehaviorModels.zip'
 
-    # Ensure the supplementary folder exists
+    # Do not create fb_path yet: runApp() uses its existence to decide whether
+    # to retry a download after a failure.
     os.makedirs(supplementary_path, exist_ok=True)
 
     # Send an HTTP GET request to the URL
@@ -56,7 +57,7 @@ def downloadApps() -> None:
     # Check if the request was successful (status code 200)
     if response.status_code == 200:
         # Path to save the downloaded zip file
-        zip_file_path = os.path.join(supplementary_path, 'FB.zip')
+        zip_file_path = os.path.join(supplementary_path, 'FireBehaviorModels.zip')
 
         # Open a local file in binary write mode and save the downloaded content
         with open(zip_file_path, 'wb') as file:
@@ -64,11 +65,13 @@ def downloadApps() -> None:
 
         print(f'Download complete: {zip_file_path}')
 
-        # Extract the zip file to the supplementary folder
+        # The package contents sit at the zip root, so extract directly into
+        # fb_path after the download has succeeded.
+        os.makedirs(fb_path, exist_ok=True)
         with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
-            zip_ref.extractall(supplementary_path)
+            zip_ref.extractall(fb_path)
 
-        print(f'Extraction complete: {supplementary_path}')
+        print(f'Extraction complete: {fb_path}')
 
         # Delete the zip file after extraction
         os.remove(zip_file_path)
@@ -928,9 +931,9 @@ def genInputFile(
             if app_select == 'FlamMap':
                 file.write('FlamMap-Inputs-File-Version-1\n')
             elif app_select in ['MTT', 'TOM']:
-                file.write('ShortTerm-Inputs-File-Version-1\n')
+                file.write('FlamMap-Inputs-File-Version-1\n')
             else:
-                file.write('FARSITE INPUTS FILE VERSION 1.0\n')
+                file.write('Farsite-Inputs-File-Version-1\n')
             # Implement Base/Common Fuel Moisture Switches
             if app_select in ['FlamMap', 'MTT', 'TOM']:
                 if cond_period_end:
@@ -1084,17 +1087,32 @@ def genInputFile(
     return out_path
 
 
+def _buildAppEnv() -> dict:
+    """Build an isolated environment required by the vendor executables."""
+    env = os.environ.copy()
+    env['PATH'] = f'{bin_path};{env.get("PATH", "")}'
+    env['GDAL_DATA'] = os.path.join(fb_path, 'share', 'gdal')
+    env['PROJ_LIB'] = os.path.join(fb_path, 'share', 'proj')
+    env['WINDNINJA_DATA'] = os.path.join(fb_path, 'share', 'windninja')
+    env.pop('GDAL_DRIVER_PATH', None)
+    return env
+
+
 def runApp(app_select: str,
-           command_file_path: str,
+           command_file_path: Union[str, list, tuple],
            app_exe_path: Optional[str] = None,
-           suppress_messages: bool = False) -> tuple[str, str]:
+           suppress_messages: bool = False,
+           cwd: Optional[str] = None) -> tuple[str, str]:
     """
     Function to run the selected fire app through the command line interface
     :param app_select: The name of the selected fire modelling application.
-        Options are "FlamMap", "MTT", "TOM", "Farsite"
-    :param command_file_path: path to command file
+        Options are "FlamMap", "MTT", "TOM", "Farsite", "Randig", "FSPro"
+    :param command_file_path: A command-file path for FlamMap-family apps, or
+        a list/tuple of direct positional CLI arguments for Randig and FSPro.
     :param app_exe_path: path to the app executable file
     :param suppress_messages: suppress intermediate print statements during program execution
+    :param cwd: working directory. Defaults to the command file's directory
+        for command-file apps and the current directory for direct-argument apps.
     :return: A tuple containing the standard output messages, and the CLI app errors
     """
     # Check if the FB folder exists within the supplementary_data folder
@@ -1110,15 +1128,23 @@ def runApp(app_select: str,
         if not suppress_messages:
             print(f'\n<<<<< [flammap_cli.py] Running {app_select} >>>>>')
 
+        if isinstance(command_file_path, (list, tuple)):
+            popen_args = [app_exe_path] + [str(arg) for arg in command_file_path]
+            run_cwd = cwd if cwd is not None else os.getcwd()
+        else:
+            popen_args = [app_exe_path, command_file_path]
+            run_cwd = cwd if cwd is not None else os.path.dirname(command_file_path)
+
         # Run fire model through command line interface
         if not suppress_messages:
             print('Running CLI command...')
         app_cli = subprocess.Popen(
-            [app_exe_path, command_file_path],
+            popen_args,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            cwd=os.path.dirname(command_file_path)
+            cwd=run_cwd,
+            env=_buildAppEnv()
         )
         stdout, stderr = app_cli.communicate()
         if not suppress_messages:
@@ -1150,24 +1176,52 @@ def appTest(app_selection: str) -> None:
     """
     Function to run the Missoula Fire Lab Command Line Application test datasets
     :param app_selection: The name of the selected fire modelling application.
-        Options are "FlamMap", "MTT", "TOM", "Farsite". Default = "FlamMap".
+        Options are "FlamMap", "MTT", "TOM", "Farsite", "Randig", "FSPro".
+        Default = "FlamMap".
     :return: None
     """
     app_testData_dict = {
-        'FlamMap': os.path.join(fb_path, 'TestFlamMap\\SampleData'),
-        'MTT': os.path.join(fb_path, 'TestMTT\\SampleData'),
-        'TOM': os.path.join(fb_path, 'TestMTT\\SampleData'),
-        'Farsite': os.path.join(fb_path, 'TestFARSITE\\SampleData'),
-        # 'FSPro': os.path.join(fb_path, 'TestFSPro\\SampleData'),
-        # 'SpatialFOFEM': os.path.join(fb_path, 'TestSpatialFOFEM\\SampleData')
+        'FlamMap': os.path.join(fb_path, 'sampledata', 'FlamMap'),
+        'MTT': os.path.join(fb_path, 'sampledata', 'MTT'),
+        'TOM': os.path.join(fb_path, 'sampledata', 'MTT'),
+        'Farsite': os.path.join(fb_path, 'sampledata', 'Farsite'),
     }
+
+    # Randig and FSPro take positional CLI args. Both sample datasets share
+    # the landscape and ignition files in the BlueMountain sample folder.
+    blue_mountain_dir = os.path.join(fb_path, 'sampledata', 'BlueMountain')
+    app_directArgs_dict = {
+        'Randig': [
+            os.path.join(blue_mountain_dir, 'BlueMountain.tif'),
+            os.path.join(fb_path, 'sampledata', 'Randig', 'RandigInputs.txt'),
+            os.path.join(fb_path, 'sampledata', 'Randig', 'out', 'test'),
+        ],
+        'FSPro': [
+            os.path.join(blue_mountain_dir, 'BlueMountain.tif'),
+            os.path.join(fb_path, 'sampledata', 'FSPro', 'FSProInputs.txt'),
+            os.path.join(fb_path, 'sampledata', 'FSPro', 'out', 'test'),
+            os.path.join(blue_mountain_dir, 'centerIgnit.shp'),
+            '0',
+        ],
+    }
+
+    if app_selection in app_directArgs_dict:
+        runApp(app_selection, app_directArgs_dict[app_selection])
+        return
 
     # Get the test application path
     test_data_path = app_testData_dict.get(app_selection, None)
 
     if test_data_path is not None:
-        # Get the command file path
-        command_file_path = glob.glob(os.path.join(test_data_path, '*Cmd.txt'))[0]
+        command_file_matches = (
+            glob.glob(os.path.join(test_data_path, '*Command.txt'))
+            or glob.glob(os.path.join(test_data_path, '*Cmd.txt'))
+        )
+        if not command_file_matches:
+            raise FileNotFoundError(
+                f'No command file (*Command.txt or *Cmd.txt) found in {test_data_path}'
+            )
+        command_file_path = command_file_matches[0]
 
         # Run the application
         runApp(app_selection, command_file_path)
