@@ -1,150 +1,83 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Nov 29 12:30:00 2025
-
-@author: Gregory A. Greene
-"""
-__author__ = ['Gregory A. Greene, map.n.trowel@gmail.com']
+"""Manual MTT driver using repository fixtures; do not run in pytest or CI."""
 
 import os
+
 import pandas as pd
+
 import flammap_cli as fm
 
-# Get paths to data/processing directories
-test_dir = os.path.dirname(__file__)
-input_dir = os.path.join(test_dir, 'test_inputs')
-ign_dir = os.path.join(test_dir, 'test_ignitions')
-lcp_dir = os.path.join(test_dir, 'test_lcps')
-out_dir = os.path.join(test_dir, 'test_outputs', 'mtt')
-os.makedirs(lcp_dir, exist_ok=True)
-os.makedirs(out_dir, exist_ok=True)
-
-# Create path to output LCP file
-lcp_path = os.path.join(lcp_dir, 'test_lcp.tif')
-
-# Get ignition file path
-ign_path = os.path.join(ign_dir, 'ignition_point.shp')
-# ign_path = os.path.join(ign_dir, '69121_NTFBPerimeter_UTM.shp')
-
-# Set app selection
-app_selection = 'MTT'
-
-# Settings and switches
-raws_elev = 205  # Elevation of RAWs station (meters)
-raws_units = 'English'  # Units of RAWs data (English or Metric)
-wind_speed_units = 0  # Units of wind speed data (0 = mph, 1 = kph, 3 = m/s, 4 = ft/min)
-wind_direction = 45  # Wind direction value
-wind_speed = 4  # Wind speed value
-foliar_mc = 80  # Foliar moisture content (%)
-model_resolution = 30  # Modelling resolution
-crown_fire_method = 'ScottReinhardt'  # Method to use for crown fire spread (ScottReinhardt, Finney)
-sim_time = 240  # Simulation time (simulated minutes)
-travel_path_interval = 240  # Travel path interval (meters)
-spot_probability = 0  # Spot probability (proportion, range 0-1)
-spot_delay = 0  # Spot delay time (minutes)
-node_spread_num_lat = 6  # Number of nodes to spread laterally (default = 6)
-node_spread_num_vert = 4  # Number of nodes to spread vertically (default = 4)
-
-
-def get_csv_as_df(csv_path):
-    return pd.read_csv(csv_path, header=0, index_col=False)
+TEST_DIR = os.path.dirname(__file__)
+INPUT_DIR = os.path.join(TEST_DIR, "test_inputs")
+IGNITION_PATH = os.path.join(TEST_DIR, "test_ignitions", "ignition_point.shp")
+LCP_PATH = os.path.join(TEST_DIR, "test_lcps", "test_lcp.tif")
+OUTPUT_DIR = os.path.join(TEST_DIR, "test_outputs", "mtt")
 
 
 def create_lcp():
-    # Get paths to LCP input datasets
-    data_names = ['Elevation', 'Slope', 'Aspect', 'FBFM', 'CC', 'CH', 'CBH', 'CBD']
-    lcp_input_paths = [lcp_path]
-    for name in data_names:
-        lcp_input_paths.append(os.path.join(input_dir, f'{name}_UTM_resampled30m.tif'))
+    if not os.path.exists(LCP_PATH):
+        os.makedirs(os.path.dirname(LCP_PATH), exist_ok=True)
+        names = ("Elevation", "Slope", "Aspect", "FBFM", "CC", "CH", "CBH", "CBD")
+        fm.gen_lcp(
+            LCP_PATH,
+            *[
+                os.path.join(INPUT_DIR, f"{name}_UTM_resampled30m.tif")
+                for name in names
+            ],
+        )
+    return LCP_PATH
 
-    # Generate LCP file
-    fm.gen_lcp(*lcp_input_paths)
-    return
+
+def csv_data(name):
+    values = (
+        pd.read_csv(os.path.join(INPUT_DIR, name), header=0).astype(int).values.tolist()
+    )
+    return fm.gen_weather_string(values)
 
 
 def create_input():
-    # Get burn period data
-    bp_csv = os.path.join(input_dir, 'burn_periods.csv')
-    bp_df = get_csv_as_df(bp_csv)
-    # Format burn period data for gen_input_file() function
-    bp_data = fm.gen_weather_string(bp_df.astype(int).values.tolist())
-
-    # Get fuel moisture data
-    fmoist_csv = os.path.join(input_dir, 'fuel_moisture.csv')
-    fmoist_df = get_csv_as_df(fmoist_csv)
-    # Format fuel moisture data for gen_input_file() function
-    fmoist_data = fm.gen_weather_string(fmoist_df.astype(int).values.tolist())
-
-    # Get weather data
-    wx_csv = os.path.join(input_dir, 'weather.csv')
-    wx_df = get_csv_as_df(wx_csv)
-    # Format weather data for gen_input_file() function
-    raws_data = fm.gen_weather_string(wx_df.astype(int).values.tolist())
-
-    # Generate the input file
-    input_path = fm.gen_input_file(
-        out_dir=out_dir,
-        out_name='farsite_testing_input',
-        suppress_messages=False,
-        app_select=app_selection,
-        fuel_moisture_data=fmoist_data,
-        raws_elev=raws_elev,
-        raws_units=raws_units,
-        raws_data=raws_data,
-        wind_direction=wind_direction,
-        wind_speed=wind_speed,
-        wind_spd_units=wind_speed_units,
-        foliar_mc=foliar_mc,
-        crown_fire_method=crown_fire_method,
-        mtt_node_spread_num_lat=node_spread_num_lat,
-        mtt_node_spread_num_vert=node_spread_num_vert,
-        mtt_resolution=model_resolution,
-        mtt_sim_time=sim_time,
-        mtt_travel_path_interval=travel_path_interval,
-        mtt_spot_probability=spot_probability,
-        mtt_spot_delay=spot_delay,
-        mtt_ign_file_path=ign_path
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    return fm.gen_input_file(
+        out_dir=OUTPUT_DIR,
+        out_name="mtt_input",
+        app_select="MTT",
+        fuel_moisture_data=csv_data("fuel_moisture.csv"),
+        raws_elev=205,
+        raws_units="English",
+        raws_data=csv_data("weather.csv"),
+        wind_direction=45,
+        wind_speed=4,
+        wind_spd_units=0,
+        foliar_mc=80,
+        crown_fire_method="ScottReinhardt",
+        mtt_node_spread_num_lat=6,
+        mtt_node_spread_num_vert=4,
+        mtt_resolution=30,
+        mtt_sim_time=240,
+        mtt_travel_path_interval=240,
+        mtt_spot_probability=0,
+        mtt_spot_delay=0,
+        mtt_ign_file_path=IGNITION_PATH,
     )
-    return input_path
 
 
-def create_command(input_path, command_path):
-    # Create command file data list
-    mtt_out_path = os.path.join(out_dir, 'mtt_testing_output')
-    command_list = [
-        [lcp_path, input_path, ign_path, 0, mtt_out_path, 2]
-    ]
-
-    # Generate command file
+def run_mtt():
+    input_path = create_input()
+    command_path = os.path.join(OUTPUT_DIR, "mtt_command.txt")
     fm.gen_command_file(
-        out_path=command_path,
-        command_list=command_list,
-        suppress_messages=False
+        command_path,
+        [
+            [
+                create_lcp(),
+                input_path,
+                IGNITION_PATH,
+                0,
+                os.path.join(OUTPUT_DIR, "mtt_output"),
+                2,
+            ]
+        ],
     )
-    return
+    return fm.run_app("MTT", command_path)
 
 
-def run_mtt(command_path):
-    # Run MTT
-    fm.run_app(
-        app_select=app_selection,
-        command_file_path=command_path,
-        suppress_messages=False
-    )
-    return
-
-
-if __name__ == '__main__':
-    if not os.path.exists(lcp_path):
-        # Create the LCP file
-        create_lcp()
-
-    # Generate Input file
-    input_file = create_input()
-
-    # Generate Command file
-    command_file = os.path.join(out_dir, 'mtt_testing_command.txt')
-    create_command(input_path=input_file, command_path=command_file)
-
-    # Run MTT
-    run_mtt(command_path=command_file)
+if __name__ == "__main__":
+    run_mtt()
