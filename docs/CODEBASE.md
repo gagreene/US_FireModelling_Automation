@@ -13,20 +13,22 @@ Everything is file-based hand-off: raster inputs -> one stacked landscape file -
 back by the caller (not by this codebase).
 
 ```
-flammap_cli.py        <- the only production module (1185 lines)
-tests/                <- example end-to-end driver scripts (not pytest)
-Supplementary_Data/   <- vendored app binaries + sample data (fetched on demand)
+src/flame_components/   <- installable Python package
+  flammap_cli.py        <- the production module
+tests/                 <- pytest suite
+examples/              <- manual end-to-end driver scripts and fixtures
+supporting_data/       <- vendored app binaries + sample data (fetched on demand)
 Under_Development/    <- WIP/broken scratch scripts, not imported by anything
 ```
 
 ## 2. Key files and responsibilities
 
-### `flammap_cli.py` (root)
+### `src/flame_components/flammap_cli.py`
 The entire production surface. All functions are free functions (no classes).
 
 | Function | Responsibility |
 |---|---|
-| `download_apps()` | Downloads `FireBehaviorModels.zip` from alturassolutions.com, extracts its root-level contents into `supplementary_data/FB`, then deletes the zip. Called automatically by `run_app()` if `fb_path` is missing. |
+| `download_apps()` | Downloads `FireBehaviorModels.zip` from alturassolutions.com, extracts its root-level contents into `supporting_data/FB`, then deletes the zip. Called automatically by `run_app()` if `fb_path` is missing. |
 | `gen_lcp()` | Stacks 8 input rasters (elev, slope, aspect, fbfm, cc, ch, cbh, cbd) into one int16 multiband GeoTIFF via `rasterio`, writes per-band stats + histogram tags. Pure-Python path. |
 | `gen_lcp_gdal()` | Same goal, different mechanism: shells out to `gdalbuildvrt` + `gdal_translate` (LZW, ArcGIS-Composite-Bands-compatible sizing), then patches band descriptions back in with rasterio. |
 | `get_raws_text_file()` | Reads a RAWS weather text file, rewrites it in place to prepend a required "model 0" line, returns line count + contents. |
@@ -36,26 +38,28 @@ The entire production surface. All functions are free functions (no classes).
 | `gen_flammap_input_file()` | The core builder (~500 lines incl. docstring). Writes the `.input` file, branching on `app_select` ('FlamMap'/'MTT'/'TOM'/'Farsite') to emit the right switch blocks. The docstring is a de facto spec reference for every switch, valid range, and example. |
 | `run_app()` | Runs a command-file path for FlamMap-family apps or a direct list/tuple of positional CLI arguments for Randig/FSPro. Its optional `cwd` is appended after `suppress_messages` to preserve existing positional callers; `_build_app_env()` isolates vendor GDAL, PROJ, and WindNinja data. |
 | `app_test()` | Runs command-file samples from `sampledata/<App>` for FlamMap-family apps and builds direct positional args for Randig/FSPro using shared `sampledata/BlueMountain` files. |
-| `app_name_dict` / `app_exe_dict` (module-level) | Map app selection to `runflammap.exe`, `runmtt.exe`, `runfarsite.exe`, `runrandig.exe`, or `runfspro.exe` under `supplementary_data/FB/bin`. `SpatialFOFEM` was removed upstream. |
+| `app_name_dict` / `app_exe_dict` (module-level) | Map app selection to `runflammap.exe`, `runmtt.exe`, `runfarsite.exe`, `runrandig.exe`, or `runfspro.exe` under `supporting_data/FB/bin`. `SpatialFOFEM` was removed upstream. |
 
-Module-level path globals (`supplementary_path`, `fb_path`, `bin_path`) are derived from `__file__` at import time.
+Module-level path globals (`supporting_data_path`, `fb_path`, `bin_path`) use `FLAME_COMPONENTS_DATA_DIR` when set; otherwise they use the repository directory in an editable checkout or `%LOCALAPPDATA%` for an installed package.
 
-### `tests/farsite_testing.py`, `tests/mtt_testing.py`
-Not pytest — standalone example scripts, one per app, structurally near-identical:
-1. `create_lcp()` — build `.lcp` from sample rasters in `tests/test_inputs/` (skipped if the file already exists).
-2. `create_input()` — load `burn_periods.csv` / `fuel_moisture.csv` / `weather.csv` via pandas, format with `gen_weather_string()`, call `gen_flammap_input_file()`.
-3. `create_command()` — call `gen_command_file()`.
-4. `run_farsite()` / `run_mtt()` — call `run_app()`.
+### `examples/farsite_example.py`, `examples/mtt_example.py`, `examples/randig_example.py`, `examples/fspro_example.py`
+Standalone manual example scripts, one per application. They use fixtures in `examples/example_inputs/` and `examples/example_ignitions/`, create an LCP in `examples/example_lcps/`, and write model output to `examples/example_outputs/`.
 
-Each hardcodes its own settings block (wind, foliar moisture, resolution, etc.) at module scope.
+Run an example from the repository root as a module, for example `python -m examples.farsite_example`. The scripts hardcode their own model settings and must not run in pytest or CI.
 
+### `docs/reference/`
+Reference-only assets:
+- `FBFM_ColorScheme.csv` and `FBFM_ColorScheme.xlsx` provide a fuel-model display color scheme.
+- `FireApp_VariableList.xlsx` documents FireBehaviorModels variables.
+
+Neither asset is read at runtime.
 ### `Under_Development/`
-Not imported by `flammap_cli.py` or `tests/`. Treat as reference/scratch, not working code:
+Not imported by `src/flame_components/flammap_cli.py`, `tests/`, or `examples/`. Treat as reference/scratch, not working code:
 - `FOFEM.py` — `getMidflameWS()` / `genBurnupInFile()` are written with a `self` parameter but there is no enclosing class and nothing instantiates one — calling these as-is will raise `NameError`/`TypeError`.
 - `FOFEM_Automation.py` — a fragment: references `row`, `outFolder`, `consumeDF`, `fbpCF_output`, `CSV`, etc. that are never defined in the file — not runnable standalone.
 - `Test.py` — unreviewed scratch file.
 
-### `Supplementary_Data/`
+### `supporting_data/`
 Populated by `download_apps()`, not meant to be hand-edited. Contains the vendor CLI exes (`TestFlamMap`, `TestMTT`, `TestFARSITE`, ...) under `FB/bin`, sample datasets under each `Test*/SampleData`, and vendor licenses.
 
 ## 3. Data flow
@@ -86,7 +90,7 @@ flowchart TD
     GCF --> CMD["Cmd.txt command file"]
 
     subgraph run_app
-        CHECK{"supplementary_data/FB\nexists?"}
+        CHECK{"supporting_data/FB\nexists?"}
         CHECK -- no --> DL["download_apps()\n(fetch + unzip FireBehaviorModels.zip)"]
         DL --> EXE
         CHECK -- yes --> EXE["subprocess.Popen(app_exe, Cmd.txt)"]
@@ -99,7 +103,7 @@ flowchart TD
 ## 4. Implicit assumptions / gotchas
 
 - **Windows + vendor exe only.** `app_exe_dict` points at the vendor's `.exe` files; `run_app()` isn't cross-platform.
-- **Silent auto-download.** `run_app()` calls `download_apps()` automatically the first time `supplementary_data/FB` is missing — a network call with no user confirmation, no checksum/version pin on `FB.zip`, and no retry/error surfacing beyond a printed status code.
+- **Silent auto-download.** `run_app()` calls `download_apps()` automatically the first time `supporting_data/FB` is missing — a network call with no user confirmation, no checksum/version pin on `FB.zip`, and no retry/error surfacing beyond a printed status code.
 - **Band order is positional and unchecked beyond shape.** `gen_lcp()`/`gen_lcp_gdal()` assume the 8 input rasters are already co-registered (same shape/extent/CRS) — only raster *shape* is validated (`ValueError` on mismatch), not CRS or transform. Silent misalignment is possible if inputs don't actually share a grid.
 - **`-999` nodata is hardcoded** as the unified nodata value in `gen_lcp()`; any input raster whose real nodata happens to equal a valid data value at `-999` would corrupt silently (unlikely in practice, but unvalidated).
 - **`gen_flammap_input_file()` swallows exceptions.** The final `except Exception as err: print(err)` means a malformed input (e.g. missing required switch for the chosen app) produces a printed message and a *return of `out_path`* as if it succeeded — callers checking only the return value won't detect failure.
@@ -108,7 +112,7 @@ flowchart TD
 - **`stdout`/`stderr` in `run_app()` are only defined inside the `if app_exe_path is not None:` branch** — if that branch is skipped the function would hit an unbound-variable error before reaching the `ValueError` raise... but in practice the `else` branch raises first, so it's currently unreachable rather than a live bug. Worth knowing if the branch structure changes.
 - **`get_raws_text_file()` mutates its input file in place** (rewrites the file to prepend a synthesized "model 0" line) rather than writing to a new path — re-running it against an already-patched file will prepend again.
 - **Randig / FSPro** are selectable through `run_app()` and `app_test()` using direct positional CLI arguments. `gen_flammap_input_file()` does not generate their unrelated input-file formats; callers can generate those paths with `gen_randig_input_file()` and `gen_fspro_input_file()`. `SpatialFOFEM` no longer exists in the upstream package.
-- **`tests/*.py` are example scripts, not automated tests.** No pytest markers, assertions, or CI wiring despite living in `tests/` and despite a `.pytest_cache/` existing at repo root — running `pytest` will not exercise these meaningfully as pass/fail checks.
+- **`examples/*.py` are manual driver scripts, not automated tests.** They create model inputs and run vendor executables, so they must remain outside pytest and GitHub Actions.
 - **`Under_Development/` is not integrated** — don't assume `FOFEM.py` works as a library; it's written as if part of a class that doesn't exist.
 
 The package migration is documented in `development/plans/2026-09-23-fb-package-core-integration.md` and `development/plans/2026-09-23-fb-package-randig-fspro.md`.
