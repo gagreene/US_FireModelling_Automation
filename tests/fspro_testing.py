@@ -29,21 +29,21 @@ def create_input():
     out_dir = os.path.join(test_dir, "test_outputs", "fspro")
     os.makedirs(out_dir, exist_ok=True)
     return fm.gen_fspro_input_file(
-        out_dir,
-        "fspro_input",
-        1,
-        1,
-        30,
-        9,
-        1,
-        [45, 90],
-        [5],
-        [[1.0, 2.0]],
-        [[1, 2, 3, 4, 5, 6, 7, 8, 0.1, 0]],
-        [[1, 2]],
-        [1, 2],
-        [0.1, 0.2],
-        [1, 2],
+        out_dir=out_dir,
+        out_name="fspro_input",
+        duration=1,
+        num_fires=1,
+        max_lag=30,
+        poly_degree=9,
+        calm_value=1,
+        wind_directions=[45, 90],
+        wind_speeds=[5],
+        wind_cell_values=[[1.0, 2.0]],
+        erc_classes=[[1, 2, 3, 4, 5, 6, 7, 8, 0.1, 0]],
+        historic_erc_values=[[1, 2]],
+        avg_erc_values=[1, 2],
+        stddev_erc_values=[0.1, 0.2],
+        current_erc_values=[1, 2],
     )
 
 
@@ -51,11 +51,17 @@ def run_fspro(input_path, lcp_path):
     out_dir = os.path.dirname(input_path)
     ignition = os.path.join(ign_dir, "ignition_point.shp")
     return fm.run_app(
-        "FSPro",
-        [lcp_path, input_path, os.path.join(out_dir, "fspro_output"), ignition, "0"],
+        app_select="FSPro",
+        command_file_path=[
+            lcp_path,
+            input_path,
+            os.path.join(out_dir, "fspro_output"),
+            ignition,
+            "0",
+        ],
         cwd=out_dir,
     )
 
 
 if __name__ == "__main__":
-    run_fspro(create_input(), create_lcp())
+    run_fspro(input_path=create_input(), lcp_path=create_lcp())

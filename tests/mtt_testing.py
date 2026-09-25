@@ -36,7 +36,7 @@ def csv_data(name):
 
 def create_input():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    return fm.gen_input_file(
+    return fm.gen_flammap_input_file(
         out_dir=OUTPUT_DIR,
         out_name="mtt_input",
         app_select="MTT",

@@ -29,11 +29,11 @@ def create_input():
     out_dir = os.path.join(test_dir, "test_outputs", "randig")
     os.makedirs(out_dir, exist_ok=True)
     return fm.gen_randig_input_file(
-        out_dir,
-        "randig_input",
-        10,
-        720,
-        0.2,
+        out_dir=out_dir,
+        out_name="randig_input",
+        num_fires=10,
+        duration=720,
+        spot_probability=0.2,
         minimum_number_fires=10,
         mtt_spot_delay=0,
         fuel_moisture_data=(1, "0 4 6 9 60 90"),
@@ -45,11 +45,15 @@ def create_input():
 def run_randig(input_path, lcp_path):
     out_dir = os.path.dirname(input_path)
     return fm.run_app(
-        "Randig",
-        [lcp_path, input_path, os.path.join(out_dir, "randig_output")],
+        app_select="Randig",
+        command_file_path=[
+            lcp_path,
+            input_path,
+            os.path.join(out_dir, "randig_output"),
+        ],
         cwd=out_dir,
     )
 
 
 if __name__ == "__main__":
-    run_randig(create_input(), create_lcp())
+    run_randig(input_path=create_input(), lcp_path=create_lcp())

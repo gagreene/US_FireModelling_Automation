@@ -106,10 +106,10 @@ def test_app_name_dict_matches_new_vendor_exe_basenames():
         ("Farsite", "Farsite-Inputs-File-Version-1"),
     ],
 )
-def test_gen_input_file_writes_correct_version_header(
+def test_gen_flammap_input_file_writes_correct_version_header(
     tmp_path, app_select, expected_header
 ):
-    out_path = fm.gen_input_file(
+    out_path = fm.gen_flammap_input_file(
         out_dir=str(tmp_path),
         out_name="test_input",
         suppress_messages=True,

@@ -88,7 +88,7 @@ fm.runApp('FSPro', [
 
 `appTest('Randig')` and `appTest('FSPro')` run the vendor sample datasets. These are long-running model executions and are not suitable for automated CI.
 
-Dedicated `genRandigInputFile()` and `genFSProInputFile()` builders are planned on `update/fb-randig-fspro-input-generation`. Until those builders are added, callers must provide vendor-compatible Randig and FSPro input files.
+Use `gen_randig_input_file()` and `gen_fspro_input_file()` to create vendor-format input files. Randig and FSPro model runs remain manual workstation checks because the vendor executables can take several minutes or longer.
 
 ## Tests and examples
 
@@ -106,4 +106,4 @@ Run the automated test module with the interpreter configured for this project:
 
 - Generated model outputs should be stored outside committed fixtures.
 - Ignition and barrier shapefiles require their companion `.dbf`, `.prj`, and `.shx` files and must match the LCP projection.
-- `genInputFile()` intentionally supports only the FlamMap-family input format; it does not generate Randig or FSPro input files.
+- `gen_flammap_input_file()` supports FlamMap, MTT, TOM, and Farsite. Use `gen_randig_input_file()` or `gen_fspro_input_file()` for those separate vendor schemas.

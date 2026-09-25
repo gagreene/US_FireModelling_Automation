@@ -205,7 +205,45 @@ def gen_fspro_input_file(
     save_perimeters: int = 1,
     suppress_messages: bool = False,
 ) -> str:
-    """Write an FSPro input file from validated scalar, matrix, and ERC series data."""
+    """Generate a vendor-format FSPro input file.
+
+    FSPro consumes a separate input schema from FlamMap-family applications.
+    The generated file contains scalar run controls, a wind probability matrix,
+    ERC classes, historical ERC sequences, summary ERC sequences, current-year
+    ERC values, and an optional forecast. Pass the resulting path to
+    :func:`run_app` with the landscape, output base, ignition shapefile, and
+    optional barrier path as direct positional arguments.
+
+    :param out_dir: Existing directory where ``<out_name>.input`` is written.
+    :param out_name: Output filename stem.
+    :param duration: Simulation duration in days.
+    :param num_fires: Number of simulated fires; must be greater than zero.
+    :param max_lag: Maximum weather-stream lag used by FSPro.
+    :param poly_degree: Polynomial degree for the FSPro probability model.
+    :param calm_value: Wind value used for calm conditions.
+    :param wind_directions: Ordered direction values; count becomes ``NumWindDirs``.
+    :param wind_speeds: Ordered speed values; count becomes ``NumWindSpeeds``.
+    :param wind_cell_values: Matrix with one row per speed and one value per direction.
+    :param erc_classes: ERC class rows, each containing exactly ten vendor fields.
+    :param historic_erc_values: Equal-length ERC records, one row per historic year.
+    :param avg_erc_values: Average ERC values, one per weather record.
+    :param stddev_erc_values: ERC standard deviations, one per weather record.
+    :param current_erc_values: Current-year ERC sequence.
+    :param forecast: Optional forecast rows written after ``NumForecast``.
+    :param barrier_fill: Vendor binary barrier-fill flag, 0 or 1.
+    :param resolution: Optional release-compatibility Resolution switch.
+    :param crown_fire_method: ``Finney`` or FSPro-specific ``ScottRheinhardt``.
+    :param save_perimeters: Vendor binary perimeter-output flag, 0 or 1.
+    :param suppress_messages: Suppress completion output when true.
+
+    Returns:
+        Path to the generated ``.input`` file.
+
+    :raises FileNotFoundError: If ``out_dir`` does not exist.
+
+    :raises ValueError: If controls, flags, matrix dimensions, or ERC record
+            dimensions are invalid.
+    """
     if not os.path.isdir(out_dir):
         raise FileNotFoundError(out_dir)
     if (
@@ -235,6 +273,7 @@ def gen_fspro_input_file(
         raise ValueError("ERC summary lengths must match weather records")
     path = os.path.join(out_dir, out_name + ".input")
     with open(path, "w", newline="\n") as file:
+        # Use a stable comment header; do not reproduce the vendor Java object suffix.
         file.write("#FSPro Model Inputs\n#FSPro Assorted Inputs\n")
         for key, value in [
             ("Duration", duration),
@@ -257,6 +296,7 @@ def gen_fspro_input_file(
                 " ".join(map(str, wind_speeds)),
             )
         )
+        # Preserve row order: each wind-speed row has one value per direction.
         _write_rows(file, wind_cell_values)
         file.write(f"\n#ERC Classes (required)\nNumERCClasses: {len(erc_classes)}\n")
         _write_rows(file, erc_classes)
@@ -280,7 +320,7 @@ def gen_fspro_input_file(
     return path
 
 
-def gen_input_file(
+def gen_flammap_input_file(
     out_dir: str,
     out_name: str,
     suppress_messages: bool = False,
@@ -1289,7 +1329,46 @@ def gen_randig_input_file(
     conditioning_period_end: str | None = None,
     suppress_messages: bool = False,
 ) -> str:
-    """Write a Randig input file; landscape and output paths are run_app arguments."""
+    """Generate a vendor-format Randig input file.
+
+    Randig extends the FlamMap input format with stochastic-fire controls. The
+    landscape, output base, optional fire-list, and optional wind-grid paths do
+    not belong in this file; provide them as direct positional arguments to
+    :func:`run_app`. The default vendor behavior uses the landscape native
+    resolution, so ``resolution`` is omitted unless explicitly supplied.
+
+    :param out_dir: Existing directory where ``<out_name>.input`` is written.
+    :param out_name: Output filename stem.
+    :param num_fires: Maximum simulated fires; must be greater than zero.
+    :param duration: Fire duration in minutes; must be greater than zero.
+    :param spot_probability: Spotting probability in the inclusive range 0 to 1.
+    :param resolution: Optional compatibility Resolution switch.
+    :param spotting_seed: Optional deterministic spotting random seed.
+    :param mtt_spot_delay: Optional spotting ignition delay; zero is preserved.
+    :param target_burn_proportion: Optional target proportion in the range 0 to 1.
+    :param minimum_number_fires: Optional minimum fires before target evaluation.
+    :param fuel_moisture_data: ``(count, rows)`` pair for FUEL_MOISTURES_DATA.
+    :param foliar_moisture_content: Foliar moisture content percentage.
+    :param crown_fire_method: Randig vendor literal, ``ScottReinhardt``.
+    :param wind_speed: Constant wind speed.
+    :param wind_direction: Constant wind direction.
+    :param spread_direction_from_max: Direction offset from maximum spread.
+    :param gridded_winds_generate: Optional gridded-wind generation switch.
+    :param gridded_winds_resolution: Optional gridded-wind resolution.
+    :param raws_elevation: Optional RAWS station elevation.
+    :param raws_units: Optional RAWS units label.
+    :param raws_data: Optional ``(count, rows)`` RAWS block.
+    :param conditioning_period_end: Optional FlamMap conditioning-period endpoint.
+    :param suppress_messages: Suppress completion output when true.
+
+    Returns:
+        Path to the generated ``.input`` file.
+
+    :raises FileNotFoundError: If ``out_dir`` does not exist.
+
+    :raises ValueError: If controls, probabilities, crown-fire method, or multiline
+            record blocks are invalid.
+    """
     if not os.path.isdir(out_dir):
         raise FileNotFoundError(out_dir)
     if num_fires <= 0 or duration <= 0 or not 0 <= spot_probability <= 1:
@@ -1316,6 +1395,7 @@ def gen_randig_input_file(
                 file.write(f"{key}: {value}\n")
         if conditioning_period_end is not None:
             file.write(f"CONDITIONING_PERIOD_END: {conditioning_period_end}\n")
+            # The vendor fuel-moisture block supplies its declared record count and rows.
         if fuel_moisture_data is not None:
             file.write(
                 f"\nFUEL_MOISTURES_DATA: {fuel_moisture_data[0]}\n{fuel_moisture_data[1]}\n"
