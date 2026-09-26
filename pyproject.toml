@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flame-components"
+version = "0.3.0"
+description = "Utilities for preparing and running FireBehaviorModels applications."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Gregory A. Greene", email = "map.n.trowel@gmail.com" },
+]
+dependencies = [
+    "psutil",
+    "rasterio",
+    "requests",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+src = ["src"]
+target-version = "py310"

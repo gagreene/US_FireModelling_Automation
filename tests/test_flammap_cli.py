@@ -4,13 +4,20 @@ import types
 
 import pytest
 
-import flammap_cli as fm
+from flame_components import flammap_cli as fm
+
+
+def test_get_supporting_data_path_uses_environment_override(tmp_path, monkeypatch):
+    configured_path = tmp_path / "configured_supporting_data"
+    monkeypatch.setenv("FLAME_COMPONENTS_DATA_DIR", str(configured_path))
+
+    assert fm._get_supporting_data_path() == str(configured_path)
 
 
 def test_download_apps_uses_new_url_and_extracts_into_fb_path(tmp_path, monkeypatch):
-    fake_supplementary = tmp_path / "supplementary_data"
-    fake_fb = fake_supplementary / "FB"
-    monkeypatch.setattr(fm, "supplementary_path", str(fake_supplementary))
+    fake_supporting_data = tmp_path / "supporting_data"
+    fake_fb = fake_supporting_data / "FB"
+    monkeypatch.setattr(fm, "supporting_data_path", str(fake_supporting_data))
     monkeypatch.setattr(fm, "fb_path", str(fake_fb))
     captured = {}
 
@@ -62,9 +69,9 @@ def test_download_apps_uses_new_url_and_extracts_into_fb_path(tmp_path, monkeypa
 def test_download_apps_does_not_create_fb_path_on_failed_download(
     tmp_path, monkeypatch
 ):
-    fake_supplementary = tmp_path / "supplementary_data"
-    fake_fb = fake_supplementary / "FB"
-    monkeypatch.setattr(fm, "supplementary_path", str(fake_supplementary))
+    fake_supporting_data = tmp_path / "supporting_data"
+    fake_fb = fake_supporting_data / "FB"
+    monkeypatch.setattr(fm, "supporting_data_path", str(fake_supporting_data))
     monkeypatch.setattr(fm, "fb_path", str(fake_fb))
 
     def fake_get(url, stream=True):

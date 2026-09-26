@@ -11,12 +11,12 @@ Python utilities for preparing and running the Missoula Fire Sciences Laboratory
 - Randig
 - FSPro
 
-The main module is `flammap_cli.py`. It downloads the current vendor package when needed, creates landscapes and FlamMap-family input files, and invokes vendor executables.
+The main module is `src/flame_components/flammap_cli.py`. It downloads the current vendor package when needed, creates landscapes and FlamMap-family input files, and invokes vendor executables.
 
 ## Requirements
 
 - Windows
-- Python 3.8 or later
+- Python 3.10 or later
 - Conda is recommended
 - Python packages used by the module: `rasterio`, `requests`, and `psutil`
 
@@ -27,41 +27,42 @@ conda create --name firemodelling --file conda-spec-file-windows.txt
 conda activate firemodelling
 ```
 
-## Vendor package and local data
+Install the repository as an editable package before using its examples:
 
-`downloadApps()` downloads `FireBehaviorModels.zip` and extracts it to:
-
-```text
-supplementary_data/FB/
+```powershell
+python -m pip install --editable .
 ```
 
-That directory contains executable files in `bin/` and vendor sample data in `sampledata/`. It is ignored by Git. The previous local package, when retained, is stored at `supplementary_data/FB_old/` and is also ignored.
+## Supporting data
 
+`download_apps()` downloads `FireBehaviorModels.zip` and extracts it to `supporting_data/FB/`. The directory contains vendor executables in `bin/` and vendor sample data in `sampledata/`. It is ignored by Git; an optional prior package belongs in `supporting_data/FB_old/`.
+
+For an editable checkout, `supporting_data/` at the repository root is the default. For a normal installed package, the default is `%LOCALAPPDATA%\flame_components\supporting_data`. Set `FLAME_COMPONENTS_DATA_DIR` before importing `flame_components` to use another writable location.
 ## Basic workflow
 
-1. Create an LCP landscape with `genLCP()` or `genLCP_gdal()`.
+1. Create an LCP landscape with `gen_lcp()` or `gen_lcp_gdal()`.
 2. Create a model input file.
-3. Run the selected executable with `runApp()`.
+3. Run the selected executable with `run_app()`.
 
-FlamMap, MTT, TOM, and Farsite use `genInputFile()` and `genCommandFile()`:
+FlamMap, MTT, TOM, and Farsite use `gen_flammap_input_file()` and `gen_command_file()`:
 
 ```python
-import flammap_cli as fm
+from flame_components import flammap_cli as fm
 
-input_path = fm.genInputFile(
+input_path = fm.gen_flammap_input_file(
     out_dir='outputs',
     out_name='flammap_run',
     app_select='FlamMap',
     fuel_moisture_data=(1, '0 4 6 9 60 90'),
 )
 
-command_path = fm.genCommandFile(
-    out_dir='outputs',
-    out_name='flammap_run',
+command_path = 'outputs/flammap_run_command.txt'
+fm.gen_command_file(
+    out_path=command_path,
     command_list=[['landscape.tif', input_path, 'outputs/flammap_run']],
 )
 
-stdout, stderr = fm.runApp('FlamMap', command_path)
+stdout, stderr = fm.run_app('FlamMap', command_path)
 ```
 
 ## Randig and FSPro
@@ -70,14 +71,14 @@ Randig and FSPro are integrated as direct-argument applications. Their executabl
 
 ```python
 # Randig: landscape, Randig input file, output base
-fm.runApp('Randig', [
+fm.run_app('Randig', [
     'landscape.tif',
     'randig.input',
     'outputs/randig_run',
 ])
 
 # FSPro: landscape, FSPro input file, output base, ignition shapefile, barrier path or 0
-fm.runApp('FSPro', [
+fm.run_app('FSPro', [
     'landscape.tif',
     'fspro.input',
     'outputs/fspro_run',
@@ -86,20 +87,20 @@ fm.runApp('FSPro', [
 ])
 ```
 
-`appTest('Randig')` and `appTest('FSPro')` run the vendor sample datasets. These are long-running model executions and are not suitable for automated CI.
+`app_test('Randig')` and `app_test('FSPro')` run the vendor sample datasets. These are long-running model executions and are not suitable for automated CI.
 
 Use `gen_randig_input_file()` and `gen_fspro_input_file()` to create vendor-format input files. Randig and FSPro model runs remain manual workstation checks because the vendor executables can take several minutes or longer.
 
 ## Tests and examples
 
 - `tests/test_flammap_cli.py` contains automated coverage for downloader, executable discovery, headers, and launcher argument construction.
-- `tests/mtt_testing.py` and `tests/farsite_testing.py` are user-facing example drivers. They run vendor applications and should be launched manually.
+- `examples/` contains user-facing Farsite, MTT, Randig, and FSPro drivers. They run vendor applications and should be launched manually as modules, for example `python -m examples.farsite_example`.
 - Vendor smoke tests can take several minutes or longer and must remain outside pytest and GitHub Actions.
 
 Run the automated test module with the interpreter configured for this project:
 
 ```powershell
-& 'C:\Users\ggreene\.conda\envs\ProcessGeospatial\python.exe' -m pytest tests\test_flammap_cli.py -v
+python -m pytest tests\test_flammap_cli.py -v
 ```
 
 ## Notes
