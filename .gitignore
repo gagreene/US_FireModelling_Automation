@@ -4,3 +4,9 @@
 
 /examples/example_lcps/
 /examples/example_outputs/
+
+*.egg-info/
+
+/build/
+
+/dist/

@@ -100,7 +100,7 @@ Use `gen_randig_input_file()` and `gen_fspro_input_file()` to create vendor-form
 Run the automated test module with the interpreter configured for this project:
 
 ```powershell
-& 'C:\Users\ggreene\.conda\envs\ProcessGeospatial\python.exe' -m pytest tests\test_flammap_cli.py -v
+python -m pytest tests\test_flammap_cli.py -v
 ```
 
 ## Notes
